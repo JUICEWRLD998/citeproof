@@ -198,6 +198,8 @@ Kept deliberately: a plan that still asserts a falsified assumption misleads who
 | 11 | An exact `citations[].cite` match identifies one case | **FALSIFIED** | `us/572`: 803 of 893 distinct cites are claimed by >1 record, max 27. The sharers are DIFFERENT cases — SCOTUS orders lists print many dispositions per page. But this is an `us` artefact, not corpus-wide: `f-supp-2d` and `f-supp-3d` measured **0.0%**, `f2d` 1.5% |
 | 12 | A citation's shape separates a fabricated cite from an unreachable real one | **FALSIFIED** | `.recon/probe-slugs.mjs` printed `discriminator FAILED`. `999 U.S. 1234` is structurally plausible (`us` reaches page 2722) and so is `678 F. Supp. 3d 443` (`f-supp-3d` reaches 1326). Both 404. **Do not build on it** |
 | 13 | Empty-opinion corpus records are rare edge cases | **FALSIFIED** | 41 of 48 sampled `us/572` records have an empty `opinions` array (orders lists). Captured as a flag, not an error, so Phase 4 cannot reach FABRICATED from it |
+| 14 | All four Phase 2 normalisation traps are real | **FALSIFIED** | Only **three** are. `“s finding` is the retracted finding — **0 occurrences of `“s`** in the raw bytes; the corpus reads "this finding is amply supported by modern authority", clean. Hyphenation is also absent (0 occurrences of `-\n`). See the Phase 2 correction |
+| 15 | A ground-truth quote can be located with `brief.indexOf(quote)` | **FALSIFIED** | Returns **-1 for all five** expectations: the fixture stores quotations whitespace-normalised while the brief wraps them across lines. Every Phase 0 test item was silently built with a zero-length span at offset 0, invisible only because `auditItem` was still `NotImplemented` |
 
 **Retraction note (kept by convention).** Mid-recon I concluded from a snippet dump that CL search "returns 135 cases that don't contain the phrase." That inference was unsound — it read *phrase absent* off a snippet that merely doesn't display it, and opinions are long. §3.3's rigorous tests replaced it. The corrected finding is subtler and is what the product is built on.
 
@@ -293,7 +295,35 @@ Each phase ends with **acceptance criteria that are testable**, and a named fail
 **Acceptance:** parses `347 U.S. 483`, `678 F. Supp. 3d 443`, `84 F. Supp. 3d 784`, `347 U.S. at 495`; **four trap tests green:** `"separate educational..."` matches `"Separate educational..."`; curly→ASCII; `consti-\ntutional` → `constitutional`; `“s finding` → `His finding`; **offsets map back to the original, un-normalised string**.
 **Watch:** offsets into the *normalised* string are worse than no offsets — they deep-link to the wrong characters. Test the round-trip explicitly.
 
+**CORRECTION to this phase's acceptance criteria (added Phase 2, 2026-09-22).** The Acceptance line above names **four** traps. Only **three** are real. The fourth — `“s finding` → `His finding` — is the *retracted* OCR-damage finding. `.recon/probe-normalisation-traps.mjs` measures **0 occurrences of `“s`** across all fixtures; the corpus reads `this finding is amply supported by modern authority`, clean. The `“s` was our own console truncation.
+
+The rule is implemented **nowhere**, deliberately. Implementing it would not fail loudly — it would rewrite correct text into other correct-looking text, and the damage would surface only as a lost match. `tests/normalize.test.ts` asserts the zero count and pins the decision, so nobody re-derives the rule from this line without meeting the evidence. It is left in the criteria above rather than deleted, so the correction is visible where the claim was made.
+
+Two further measured notes on the same line: **hyphenation is also ABSENT** from this corpus (0 occurrences of `-\n`), so that rule is kept but never fires on real data; and **NFC normalisation is length-preserving** on every fixture and the brief, which is what licenses applying it ahead of the offset map — with a guard test that fails if that stops being true.
+
+### Phase 2 — complete, 2026-09-22 (receipts)
+
+Built on branch `phase-2-parser-normalisation`. Files: `lib/match/normalize.ts`, `lib/match/match.ts`, `lib/resolve/parse.ts`, `tests/normalize.test.ts`, `tests/parse.test.ts`.
+
+| Acceptance criterion | Result | Evidence |
+|---|---|---|
+| Parses `347 U.S. 483` | **PASS** | vol/reporter/page + `year 1954` |
+| Parses `678 F. Supp. 3d 443` | **PASS** | Longest-spelling alternation; `F. Supp. 3d` wins over `F. Supp.` |
+| Parses `84 F. Supp. 3d 784` | **PASS** | The truncation trap: a shorter reporter match would have read page **3** |
+| Parses `347 U.S. at 495` | **PASS** | Recorded as pincite 495, page 0, `shortForm: true` |
+| Trap: `"separate educational..."` matches `"Separate educational..."` | **PASS** | Case-fold; `Separate` at corpus offset **9564**, lowercase `-1` |
+| Trap: curly → ASCII | **PASS** | 177 U+201C, 168 U+201D, 103 U+2019 present in fixtures |
+| Trap: `consti-\ntutional` → `constitutional` | **PASS** | Implemented; measured **0** occurrences in this corpus so it never fires here |
+| Trap: `“s finding` → `His finding` | **NOT APPLICABLE** | **Retracted finding — 0 occurrences.** Asserted absent instead, see the correction above |
+| Offsets map back to the ORIGINAL, un-normalised string | **PASS** | Round-trip asserted for every fixture, plus explicit cases for a match preceded by, and ending on, collapsed whitespace |
+| Short-form carry-forward (`Id.`, `supra`, `at 495`) | **PASS** | `Id. at 495` resolves to Brown's coordinates while reporting the text a lawyer wrote |
+| Typecheck / suite | **PASS** | `tsc --noEmit` exit 0; parse 33/33; normalize + traps 33/33; full suite **104 passed / 13 failed / 1 todo**, and all 13 failures are the single `auditItem is not implemented yet — Phase 4` |
+
+**Watch item addressed:** the round-trip is tested explicitly rather than assumed, and the mapped-offset design exists *because* of it — offsets measured in normalised space would point at the wrong characters in the original.
+
+---
 ### Phase 3 — Resolution cascade · Day 2–3
+
 **Goal:** citation string → resolved case + verbatim text, never by case name.
 **Tasks:** CAP exact-`citations[].cite` match · CL search cross-check on the citation string only · merge enrichment · a **visible attempt log** (demo material, not debug output).
 **Files:** `lib/resolve/cascade.ts`, `lib/resolve/courtlistener.ts`, `tests/resolve.test.ts`

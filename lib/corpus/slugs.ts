@@ -83,3 +83,16 @@ export function citationReporterToSlug(token: string): ReporterSlug | null {
   const lowered = upper.toLowerCase();
   return isKnownSlug(lowered) ? lowered : null;
 }
+
+/**
+ * Every reporter spelling the parser may recognise, LONGEST FIRST.
+ *
+ * Exported so the citation parser is built from this measured table rather than carrying a
+ * second, drifting list of regex alternatives. Longest-first ordering keeps the alternation
+ * deterministic: `F. Supp. 3d` must be tried before `F. Supp.`, or `84 F. Supp. 3d 784` can be
+ * read as volume 84 / `F. Supp.` / page 3. (The page guard in the parser blocks that
+ * independently — two defences, because this is a silent wrong-citation class of bug.)
+ */
+export const REPORTER_SPELLINGS: readonly string[] = Object.keys(REPORTER_ALIASES).sort(
+  (a, b) => b.length - a.length,
+);

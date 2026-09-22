@@ -12,9 +12,12 @@ const root = process.cwd();
 const brownPath = join(root, "fixtures/corpus/us-347-0483-01.json");
 let brownText = "";
 try {
-  brownText = JSON.parse(readFileSync(brownPath, "utf8"))
-    .casebody.opinions.map((o: { text: string }) => o.text)
-    .join("\n");
+  // These fixture copies are CURATED records written by .recon/fetch-fixtures.mjs: `text` is
+  // already the assembled string. The previous version of this file read
+  // `.casebody.opinions[].text`, which does not exist on a curated record — it threw, the catch
+  // swallowed it, and `brownText` stayed empty, so every test below failed on the guard rather
+  // than on the matcher. Read the field that is actually there.
+  brownText = JSON.parse(readFileSync(brownPath, "utf8")).text ?? "";
 } catch {
   brownText = "";
 }
@@ -32,7 +35,12 @@ describe("normalisation", () => {
   it("normalises curly quotes to ASCII", () => {
     // VERIFIED present in corpus: Plessy's text carries U+201C/U+201D.
     expect(normalize("“separate but equal”")).toBe('"separate but equal"');
-    expect(normalize("O’Brien")).toBe("O'Brien");
+    // Lowercased as well, because case-folding is trap 1 and is not optional. The ASCII
+    // comparison is what proves the curly apostrophe was MAPPED rather than silently dropped.
+    // (This assertion previously read `"O'Brien"`, which contradicted case-folding. It never ran
+    // green — it was a NotImplemented failure — so the inconsistency went unnoticed until now.)
+    expect(normalize("O’Brien")).toBe("o'brien");
+    expect(normalize("O’Brien")).toBe(normalize("O'Brien"));
   });
 
   it("collapses whitespace and joins line-break hyphenation", () => {
