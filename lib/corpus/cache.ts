@@ -1,0 +1,171 @@
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+/**
+ * sha256-keyed disk cache for corpus opinion records.
+ *
+ * Keyed by the CORPUS's own `analysis.sha256`, not by a hash of our request. That matters:
+ * the corpus sha identifies the text, so two different citations pointing at the same case
+ * (parallel citations, or a pincite variant) hit one entry, and a corpus re-OCR invalidates
+ * the entry automatically instead of silently serving text that no longer matches.
+ *
+ * The cache is deliberately dumb — a file per key. No eviction: the working set is a few
+ * hundred opinions at most, and a wrong eviction costs a network round trip against a
+ * ~5/min third-party budget.
+ */
+
+export interface CachePaths {
+  /** Read-only. Curated fixture copies land here; see getCaseAt's fixture fallback. */
+  fixtures: string;
+  /** Read-write. Gitignored (.cache/). Case text, keyed by corpus sha256. */
+  runtime: string;
+  /** Read-write. Gitignored (.cache/). Volume metadata, keyed by reporter+volume (no sha). */
+  runtimeIndex: string;
+}
+
+export function defaultCachePaths(root = process.cwd()): CachePaths {
+  return {
+    fixtures: join(root, "fixtures", "corpus"),
+    runtime: join(root, ".cache", "corpus"),
+    runtimeIndex: join(root, ".cache", "index"),
+  };
+}
+
+/** fixtures/corpus/index.json — curated coordinates, so citations resolve with no network. */
+export interface FixtureIndexEntry {
+  citation: string;
+  reporter: string;
+  volume: number;
+  caseFile: string;
+  caseName: string;
+  /** Every parallel citation this case carries, all of them valid lookup keys. */
+  allCitations: string[];
+}
+
+export interface FixtureIndex {
+  $provenance?: { source?: string; generatedBy?: string; note?: string };
+  cases: FixtureIndexEntry[];
+}
+
+/** Safe on Windows: keeps hostname/port readable for a human debugging the cache. */
+function safeSegment(value: string): string {
+  return value.replace(/[^a-z0-9.-]/gi, "_");
+}
+
+export interface CacheKeyParts {
+  reporter: string;
+  volume: number;
+  /** The CAP host, so a mirrored corpus never collides with the upstream one. */
+  host: string;
+}
+
+export function cacheFileName(parts: CacheKeyParts, sha256: string): string {
+  return `${safeSegment(parts.reporter)}-${parts.volume}-${safeSegment(parts.host)}-${sha256}.json`;
+}
+
+export interface CachedRecord {
+  /** The raw CAP case JSON, verbatim. Shape is validated on read, not on write. */
+  record: unknown;
+  path: string;
+}
+
+export class CorpusCache {
+  constructor(private readonly paths: CachePaths = defaultCachePaths()) {}
+
+  /** Runtime cache only. Fixture reads go through `readFixture`, which is a different question. */
+  read(reporter: string, volume: number, sha256: string): CachedRecord | null {
+    return this.readFrom(this.paths.runtime, { reporter, volume, host: "static.case.law" }, sha256);
+  }
+
+  write(reporter: string, volume: number, sha256: string, record: unknown): CachedRecord {
+    const path = this.pathFor(this.paths.runtime, { reporter, volume, host: "static.case.law" }, sha256);
+    mkdirSync(this.paths.runtime, { recursive: true });
+    writeFileSync(path, JSON.stringify(record), "utf8");
+    return { record, path };
+  }
+
+  private pathFor(dir: string, parts: CacheKeyParts, sha256: string): string {
+    return join(dir, cacheFileName(parts, sha256));
+  }
+
+  private readFrom(dir: string, parts: CacheKeyParts, sha256: string): CachedRecord | null {
+    const path = this.pathFor(dir, parts, sha256);
+    if (!existsSync(path)) return null;
+    try {
+      return { record: JSON.parse(readFileSync(path, "utf8")), path };
+    } catch {
+      // A truncated cache file is treated as a miss. Never as an error: a corrupt cache
+      // must not be able to fail an audit, only cost a refetch.
+      return null;
+    }
+  }
+
+  /**
+   * Read a curated fixture copy by its CAP coordinates.
+   *
+   * fixtures/corpus/ is keyed `<reporter>-<volume>-<file>.json`, not by sha — the fixtures
+   * exist so the suite runs offline, and hashing them would make the fixture filenames
+   * opaque for no benefit. This is why the fixture path is a distinct lookup rather than
+   * the same cache with a different directory.
+   */
+  readFixture(reporter: string, volume: number, caseFile: string): CachedRecord | null {
+    const path = join(this.paths.fixtures, `${reporter}-${volume}-${caseFile}.json`);
+    if (!existsSync(path)) return null;
+    try {
+      return { record: JSON.parse(readFileSync(path, "utf8")), path };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Curated citation -> coordinates table, so a citation resolves offline.
+   *
+   * Without this, `getCaseByCitation` would need a network call for the VOLUME INDEX even
+   * when the case text itself is a local fixture — mapping a citation to a case file is not
+   * something a filename can do. This file is generated by .recon/fetch-fixtures.mjs and
+   * committed, which is what makes the whole suite runnable with no network at all.
+   */
+  readFixtureIndex(): FixtureIndex | null {
+    const path = join(this.paths.fixtures, "index.json");
+    if (!existsSync(path)) return null;
+    try {
+      return JSON.parse(readFileSync(path, "utf8")) as FixtureIndex;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Volume metadata array, keyed by reporter+volume rather than by sha.
+   *
+   * This is the second cache layer, and it exists because a citation maps to a case FILE,
+   * not to a sha: `analysis.sha256` identifies text we have not fetched yet. Keyed without
+   * the sha, a volume index costs one request and then serves every citation inside it.
+   * Volume lists do grow upstream (new cases are added to a volume), so this layer is the
+   * one to distrust first if a citation should resolve and does not.
+   */
+  readVolumeIndex(reporter: string, volume: number): CachedRecord | null {
+    const path = join(this.paths.runtimeIndex, `${safeSegment(reporter)}-${volume}-index.json`);
+    if (!existsSync(path)) return null;
+    try {
+      return { record: JSON.parse(readFileSync(path, "utf8")), path };
+    } catch {
+      return null;
+    }
+  }
+
+  writeVolumeIndex(reporter: string, volume: number, metadata: unknown): CachedRecord {
+    const dir = this.paths.runtimeIndex;
+    const path = join(dir, `${safeSegment(reporter)}-${volume}-index.json`);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path, JSON.stringify(metadata), "utf8");
+    return { record: metadata, path };
+  }
+
+  /** sha256 of a text, for the cases where CAP exposes no analysis block. */
+  static hashText(text: string): string {
+    return createHash("sha256").update(text, "utf8").digest("hex");
+  }
+}

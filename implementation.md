@@ -13,7 +13,7 @@ Recon evidence for every claim in §4/§5 is in `.recon/` — 7 keyless probe sc
 | Gate | State |
 |---|---|
 | **R1 Student eligibility** | **CLOSED — user is a student.** |
-| **R2 LLM credential** | **OPEN — verified absent, not verified broken.** `node .recon/verify-openrouter.mjs` on 2026-09-22 reports `OPENROUTER_API_KEY: NOT FOUND` in `.env`. No key has been supplied, so no live call was possible. **Phase 6 is blocked**; Phases 1–5 are unaffected and the core runs at $0. The app already degrades to the deterministic corpus path with no key, so this is a known gap, not a blocker. Add the key to `.env` (gitignored) and re-run that script to close it. |
+| **R2 LLM credential** | **CLOSED 2026-09-22 — verified by one live call.** `node .recon/verify-openrouter.mjs` → `HTTP 200`, reply `"OK"`, `finish_reason: stop`, model echoed `google/gemini-2.5-flash`, generation `gen-1790112478-qepPrtxnqpcKwSoiNSI1`. The key was previously *absent*; it is now present (length 73, `sk-or-v` prefix) and proven to work. **Phase 6 is unblocked.** The belt remains optional by design — the app still degrades to the deterministic corpus path with no key. |
 | **R3 Corpus coverage boundary** | Design constraint. Verify the CAP upper date boundary on Day 1 and record it in `docs/LIMITS.md`. |
 | Runtime cost | Core **$0** (keyless corpora). Belt ≈ **$0.013/citation**, **~$0.26** per 20-citation brief. |
 | Format | Rules want repo **or** live URL → ship both. |
@@ -31,10 +31,28 @@ Recon evidence for every claim in §4/§5 is in `.recon/` — 7 keyless probe sc
 | UI verified by driving a browser, not by grep | **PASS** | `.recon/driver.mjs` → **18/18**, with a planted 550/400/500 control proving the probe is not blind; screenshots in `.recon/shots/` |
 | Palette ratios measured, controls planted | **PASS** | `.recon/contrast.mjs` → control correctly flags a planted 1.07:1 pair; 5 real failures found and solved |
 | Coverage boundary recorded | **PASS** | `us` ends 2014-06-03 · `f3d` 2019-09-09 · `f-supp-3d` 2019-08-19 (`Mata v. Avianca` absent → E4 is real) |
-| Public repo pushed | **PARTIAL** | git initialised + first commit locally. `gh` is not installed and no remote URL was supplied, so **no push has happened.** Provide a remote, then `git remote add origin <url> && git push -u origin main`. |
-| LLM key verified by one live call | **BLOCKED** | `OPENROUTER_API_KEY` not present (see R2 above) |
+| Public repo pushed | **PASS** | `origin` = `github.com/JUICEWRLD998/citeproof`. Verified with `git ls-remote`, not the push exit code: `refs/heads/main` = `0e61ccf`. `gh` is still not installed, so PRs are opened through the URL GitHub prints, not the CLI. |
+| LLM key verified by one live call | **PASS** | See R2 above — HTTP 200, model echoed, generation id recorded. |
 
 The probe scripts under `.recon/` are the evidence base and are committed — `node .recon/<name>.mjs` re-derives every number above.
+
+---
+
+### Phase 1 — complete, 2026-09-22 (receipts)
+
+Built on branch `phase-1-corpus-layer`. Files: `lib/corpus/{cap,cache,coverage,slugs,index}.ts`, `tests/corpus.test.ts`, `fixtures/coverage.json`, `fixtures/corpus/index.json`, `docs/LIMITS.md`.
+
+| Acceptance criterion | Result | Evidence |
+|---|---|---|
+| `getCase("347 U.S. 483")` returns >20,000 chars containing `"inherently unequal"` | **PASS** | 26,823 chars, `ocr 0.664`, `1954-05-17`. The frozen fixture offset 9564 reproduces exactly, so Phase 0's ground truth still holds |
+| A second call is served from cache with **zero** network calls | **PASS** | Asserted twice: a `fetchImpl` that throws if touched on the curated path, and a call counter that does not move on the second runtime-cache read |
+| `getCase("999 U.S. 99999")` returns a typed `OutOfCoverage`, not a throw | **PASS** | `CorpusError{kind:"OutOfCoverage", boundary}`. Decided **before** any I/O — the test's `fetchImpl` throws, and it is never reached |
+| Reporter slug map confirmed empirically, not assumed | **PASS** | `.recon/probe-slugs.mjs` enumerated **404** reporters. The pattern is NOT uniform and every pattern-derived slug 404'd — see §4 |
+| Coverage-boundary detector | **PASS** | `fixtures/coverage.json`, generated from measured data: 9 reporters with boundaries, `us` ends 2014-06-03, `f-supp-3d` 2019-08-19. Unmapped reporters return null rather than a guessed date |
+| CL never on the hot path | **PASS** | No CourtListener code in Phase 1 at all. CAP static only, paced, 404s not retried |
+| Typecheck / suite | **PASS** | `tsc --noEmit` exit 0; corpus suite 32/32; full suite 33 passed / 22 failed (the unchanged Phase 0 stubs) / 1 todo |
+
+**Watch item from the plan — "if the coverage boundary is not detected here, UNVERIFIABLE becomes a lie later" — is addressed but not finished.** The boundary is detected and typed. What is deliberately *not* claimed is that a fabricated citation can be told apart from an unreachable real one; the probe failed to find that discriminator, and `coverage.ts` says so instead of guessing (§4 row 12).
 
 ---
 
@@ -176,8 +194,14 @@ Kept deliberately: a plan that still asserts a falsified assumption misleads who
 | 7 | Anonymous capacity supports a verification loop | **FALSIFIED** | ~5/min anon; free authed 5/min, 50/hr, 125/day |
 | 8 | Anthropic key needed for the belt | **FALSIFIED** | superseded → OpenRouter + `google/gemini-2.5-flash` (§3.3) |
 | 9 | 1M context means no chunking needed | **CONFIRMED** | `context_length: 1048576` |
+| 10 | CAP reporter slugs follow a uniform naming pattern | **FALSIFIED** | 404 reporters enumerated. Every pattern-derived slug 404'd (`f-2d`, `a-2d`, `so-2d`, `l-ed`, `p-2d`, `b-r`), while `us`, `f2d`, `so2d`, `l-ed-2d`, `cal-2d`, `f-appx` and `misc2d` all coexist. A synthesiser produces confident wrong URLs |
+| 11 | An exact `citations[].cite` match identifies one case | **FALSIFIED** | `us/572`: 803 of 893 distinct cites are claimed by >1 record, max 27. The sharers are DIFFERENT cases — SCOTUS orders lists print many dispositions per page. But this is an `us` artefact, not corpus-wide: `f-supp-2d` and `f-supp-3d` measured **0.0%**, `f2d` 1.5% |
+| 12 | A citation's shape separates a fabricated cite from an unreachable real one | **FALSIFIED** | `.recon/probe-slugs.mjs` printed `discriminator FAILED`. `999 U.S. 1234` is structurally plausible (`us` reaches page 2722) and so is `678 F. Supp. 3d 443` (`f-supp-3d` reaches 1326). Both 404. **Do not build on it** |
+| 13 | Empty-opinion corpus records are rare edge cases | **FALSIFIED** | 41 of 48 sampled `us/572` records have an empty `opinions` array (orders lists). Captured as a flag, not an error, so Phase 4 cannot reach FABRICATED from it |
 
 **Retraction note (kept by convention).** Mid-recon I concluded from a snippet dump that CL search "returns 135 cases that don't contain the phrase." That inference was unsound — it read *phrase absent* off a snippet that merely doesn't display it, and opinions are long. §3.3's rigorous tests replaced it. The corrected finding is subtler and is what the product is built on.
+
+**Correction note (Phase 1, kept by the same convention).** The first E6 sweep proposed `572 U.S. 1110` (Biton v. Lippert) as the empty-casebody fixture. It is unusable: the citation matches **13 different cases**, and the sweep had verified case files as `<page>-01`, which is wrong when one page holds many records — so it had confirmed the wrong records. Re-run under a uniqueness constraint. The replacement (`392 F. Supp. 3d 138`) is sourced but still **not wired**, because what "no casebody text" means is unresolved: its `head_matter` is 6,397 chars and the measured distribution is bimodal with no obvious cut. Phase 4 requires a threshold with a recorded number, so the fixture stays unwired and the `it.todo` stays visible rather than a vibe being encoded. Both corrections, and the two retracted claims, are carried in `docs/LIMITS.md` §7.
 
 ---
 

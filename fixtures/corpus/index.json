@@ -1,0 +1,51 @@
+{
+  "$provenance": {
+    "source": "https://static.case.law/<reporter>/<vol>/cases/<file>.json",
+    "generatedBy": ".recon/fetch-fixtures.mjs",
+    "note": "Curated citation -> coordinates table. Lets the suite and the keyless demo resolve citations offline. Do not hand-edit."
+  },
+  "cases": [
+    {
+      "citation": "163 U.S. 537",
+      "reporter": "us",
+      "volume": 163,
+      "caseFile": "0537-01",
+      "caseName": "Plessy v. Ferguson",
+      "allCitations": [
+        "163 U.S. 537",
+        "41 L. Ed. 256",
+        "16 S. Ct. 1138",
+        "1896 U.S. LEXIS 3390",
+        "SCDB 1895-271"
+      ]
+    },
+    {
+      "citation": "347 U.S. 483",
+      "reporter": "us",
+      "volume": 347,
+      "caseFile": "0483-01",
+      "caseName": "Brown v. Board of Education",
+      "allCitations": [
+        "347 U.S. 483",
+        "98 L. Ed. 2d 873",
+        "74 S. Ct. 686",
+        "1954 U.S. LEXIS 2094",
+        "SCDB 1953-069"
+      ]
+    },
+    {
+      "citation": "477 U.S. 242",
+      "reporter": "us",
+      "volume": 477,
+      "caseFile": "0242-01",
+      "caseName": "Anderson v. Liberty Lobby, Inc.",
+      "allCitations": [
+        "477 U.S. 242",
+        "91 L. Ed. 2d 202",
+        "106 S. Ct. 2505",
+        "SCDB 1985-125",
+        "1986 U.S. LEXIS 115"
+      ]
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 const UA = "lexhack-recon/0.1";
 const OUT = "fixtures/corpus";
 mkdirSync(OUT, { recursive: true });
+const index = [];
 
 const targets = [
   { reporter: "us", vol: 347, file: "0483-01", name: "Brown v. Board of Education", out: "us-347-0483-01.json" },
@@ -42,7 +43,38 @@ for (const t of targets) {
   };
 
   writeFileSync(`${OUT}/${t.out}`, JSON.stringify(record, null, 2));
+
+  // The curated index is what lets a CITATION resolve to a case file with zero network
+  // calls. Without it, getCaseByCitation would have to fetch the volume index even when the
+  // case text is already on disk — a filename cannot map a citation to a case.
+  index.push({
+    citation: record.citation,
+    reporter: t.reporter,
+    volume: t.vol,
+    caseFile: t.file,
+    caseName: record.caseName,
+    allCitations: record.allCitations ?? [],
+  });
+
   console.log(
     `OK   ${t.out.padEnd(26)} ${String(text.length).padStart(6)} chars  ocr=${record.ocrConfidence}  ${record.citation}`,
   );
 }
+
+writeFileSync(
+  `${OUT}/index.json`,
+  JSON.stringify(
+    {
+      $provenance: {
+        source: "https://static.case.law/<reporter>/<vol>/cases/<file>.json",
+        fetchedAt: new Date().toISOString().slice(0, 10),
+        generatedBy: ".recon/fetch-fixtures.mjs",
+        note: "Curated citation -> coordinates table. Lets the suite and the keyless demo resolve citations offline. Do not hand-edit.",
+      },
+      cases: index,
+    },
+    null,
+    2,
+  ),
+);
+console.log(`wrote ${OUT}/index.json — ${index.length} curated cases (citation resolution needs no network)`);
