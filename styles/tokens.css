@@ -1,0 +1,135 @@
+/*
+ * CiteProof — "Annotated Brief" design tokens.
+ *
+ * Derived from the subject: a legal brief under audit — paper, ink, a margin, and marks
+ * in that margin. Deliberately NOT a terminal/CRT/neon aesthetic (the default trap for
+ * any forensics brief) and NOT near-black-plus-acid-accent.
+ *
+ * Base visual language borrowed from the `warm-calm-ui` grammar: warm neutrals, exactly
+ * one accent, weight 550, warm-tinted shadows, flat tints, quarter-step spacing.
+ * Two deliberate departures from that skill:
+ *   1. CSS Modules + custom properties, not Tailwind (project convention).
+ *   2. A bounded semantic verdict layer. That skill warns off many-semantic-colour
+ *      dashboards, so this extends it knowingly and confines the extra hues to verdict
+ *      marks only. See docs/DESIGN.md for the justification and the contrast table.
+ *
+ * All foreground/background pairs in this file were measured, not eyeballed:
+ * run `node .recon/contrast.mjs` to reproduce every number quoted in docs/DESIGN.md.
+ */
+
+:root {
+  /* ---- surfaces: warm, never pure white, never pure black ---- */
+  --paper: #f8f7f4;
+  --surface: #fffefa;
+  --surface-sunken: #f2f1ec;
+  --line: #e2e1da;
+  --line-strong: #cfcec6;
+
+  /* ---- ink ---- */
+  --ink: #292a26;
+  --muted: #6f7169;   /* solved for >=4.5:1 on paper (was #777970, failed at 4.12) */
+  --faint: #8d8e81;   /* solved for >=3:1 — metadata only, never body copy */
+
+  /* ---- the single accent (terracotta) ---- */
+  /*
+   * Two accent roles, because one value cannot do both jobs at an accessible contrast:
+   *   --accent      FILL only (buttons, the strike-through rule). 3.01:1 — fine for
+   *                 non-text UI components (WCAG 1.4.11), NOT for text.
+   *   --accent-ink  the accent AS TEXT (links). Solved to 4.56:1 on paper.
+   * Using --accent for a link would have shipped a 3.01:1 link — the exact "invisible
+   * control" failure this project's verification protocol exists to catch.
+   */
+  --accent: #f45e38;
+  --accent-hover: #f37954;      /* LIGHTER — fill hover, per the warm-calm grammar */
+  --accent-ink: #d4340c;        /* accent as text: 4.56:1 on paper */
+  --accent-ink-hover: #ab2a08;  /* text hover goes DARKER, not lighter. Deliberate
+                                   departure: lightening accent TEXT reduces contrast
+                                   and would drop the link below AA on hover. The
+                                   warm-calm rule about lightening applies to fills. */
+  --on-accent: #3e2118;         /* dark warm brown — never white */
+  --accent-ring: rgba(244, 94, 56, 0.18);
+
+  /* ---- verdict marks: bounded semantic layer, verdict UI only ---- */
+  --verified: #2f6b4f;
+  --misattributed: #a36200;     /* solved 4.55:1 (was #b26b00, failed at 3.92) */
+  --fabricated: #b02a1f;
+  /* UNVERIFIABLE deliberately has no colour of its own — it uses --muted, which carries
+     essentially no hue (Lab chroma 3.2 vs 23.5-73.4 for the marks above). Its quietness
+     comes from form, not from being faint: dashed rule, outlined glyph, no fill.
+     It is 7x-23x quieter than any accusation while still reading at 4.62:1. */
+
+  /* ---- radius ---- */
+  --r-chip: 5px;
+  --r-control: 7px;
+  --r-card: 10px;
+  --r-dialog: 13px;
+
+  /* ---- type ---- */
+  /*
+   * --font-*-loaded are injected by next/font (app/layout.tsx) onto <html>. The literal
+   * families follow as fallbacks so this file still works if the token is used outside
+   * the Next runtime (tests, static previews).
+   */
+  --font-sans: var(--font-sans-loaded), "DM Sans Variable", "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-mono-loaded), "DM Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --weight-body: 400;
+  --weight-ui: 550;  /* requires the VARIABLE font — a static face snaps to 500/600 */
+  --weight-hero: 650;
+  /*
+   * DM Mono ships 400/500 only, so 550 is NOT available for mono. Micro-labels set in
+   * mono therefore use 500 rather than pretending to match the sans UI weight. Getting
+   * this wrong is invisible: the browser silently synthesises or snaps the face.
+   */
+  --weight-mono: 500;
+
+  --tracking-micro: 0.55px; /* small text gets POSITIVE tracking */
+  --tracking-display: -0.015em; /* negative tracking is for large type only */
+
+  /* ---- motion ---- */
+  --t-colour: 0.15s ease;
+  --t-move: 0.2s cubic-bezier(0.2, 0, 0.2, 1);
+
+  /* ---- shadows: warm-tinted only; a neutral black shadow on warm paper reads as dirt ---- */
+  --shadow-key: 0 2px 0 rgba(216, 66, 32, 0.11);
+  --shadow-lift: 0 5px 12px rgba(238, 88, 32, 0.16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-colour: 0s;
+    --t-move: 0s;
+  }
+}
+
+/*
+ * Dark mode is a SEPARATE warm-dark spec, not an inversion.
+ * The terracotta accent vibrates on a dark surface, so it is retired for the active
+ * role and a near-white takes over — per the warm-calm-ui dark-mode rule.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1b1a18;
+    --surface: #22211e;
+    --surface-sunken: #171614;
+    --line: #34322d;
+    --line-strong: #45423b;
+
+    --ink: #f0eee8;
+    --muted: #a3a196;
+    --faint: #6f6d64;
+
+    --accent: #ffb59f;
+    --accent-hover: #ffcdbf;
+    --accent-ink: #ffb59f;        /* 10.24:1 on dark paper — the accent IS text-legible here */
+    --accent-ink-hover: #ffcdbf;
+    --on-accent: #2a1810;
+    --accent-ring: rgba(255, 181, 159, 0.2);
+
+    --verified: #7fc79f;
+    --misattributed: #e0a94a;
+    --fabricated: #f08a7e;
+
+    --shadow-key: 0 2px 0 rgba(0, 0, 0, 0.4);
+    --shadow-lift: 0 5px 12px rgba(0, 0, 0, 0.5);
+  }
+}

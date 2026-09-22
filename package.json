@@ -1,0 +1,28 @@
+{
+  "name": "citeproof",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Three-valued citation and quotation auditor over free primary law.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "fixtures:verify": "node .recon/probe-fixtures.mjs"
+  },
+  "dependencies": {
+    "next": "^16.3.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "mammoth": "^1.12.3",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}

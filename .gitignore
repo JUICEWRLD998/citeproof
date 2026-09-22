@@ -1,0 +1,28 @@
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Cached corpus opinions are refetched by Phase 1; they are not source.
+.cache/
+
+# The curated fixture copies ARE source — they make the suite offline and deterministic.
+!fixtures/corpus/
+
+.env
+.env.local
+.env*.local
+
+*.tsbuildinfo
+next-env.d.ts
+
+.DS_Store
+Thumbs.db
+
+# Headless-browser artefacts from the UI driver
+.recon/shots/
+
+# Scratch command output. The .recon/*.mjs probes ARE evidence and stay tracked;
+# their console dumps are not.
+.recon/*.log

@@ -1,0 +1,278 @@
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 40px 24px 96px;
+}
+
+/* ---------- masthead ---------- */
+.masthead {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.wordmark {
+  font-size: 25px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.tagline {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-chip);
+  padding: 3px 8px;
+}
+
+/* ---------- the thesis ---------- */
+.thesis {
+  margin: 40px 0 8px;
+  max-width: 66ch;
+}
+
+.thesis h2 {
+  font-size: 34px;
+  font-weight: var(--weight-hero);
+  letter-spacing: var(--tracking-display);
+  line-height: 1.16;
+  margin: 0 0 14px;
+}
+
+.thesis p {
+  font-size: 16px;
+  line-height: 1.62;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+
+.thesis em {
+  color: var(--ink);
+  font-style: normal;
+  font-weight: var(--weight-ui);
+}
+
+/* ---------- legend ---------- */
+.legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  margin: 36px 0 48px;
+}
+
+.legendItem {
+  background: var(--surface);
+  padding: 18px 20px;
+}
+
+.legendHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+
+.legendName {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+}
+
+.legendBody {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* verdict colour is applied only to the mark, never to the body text */
+.vVerified { color: var(--verified); }
+.vMisattributed { color: var(--misattributed); }
+.vFabricated { color: var(--fabricated); }
+.vUnverifiable { color: var(--muted); }
+
+/* ---------- the annotated brief ---------- */
+.sectionLabel {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 14px;
+}
+
+.brief {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 30px 30px 30px 0;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+/* the margin rail: every audited citation gets a left column */
+.auditedLine {
+  display: grid;
+  /*
+   * 162px, not 132px. Measured: the longest real fixture cite ("678 F. Supp. 3d 443",
+   * 18 chars) needs ~119px of content width at 11px DM Mono; a 132px column leaves only
+   * 100px, so it wrapped to three lines and pushed its verdict mark out of alignment
+   * with the other three — breaking the rail rhythm that carries the whole design.
+   */
+  grid-template-columns: 162px 1fr;
+  gap: 0;
+  align-items: start;
+  margin: 0 0 22px;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 0 14px 0 18px;
+  border-right: 1px solid var(--line);
+  min-height: 100%;
+}
+
+.railCite {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  /* Long cites hyphenate rather than overflow the rail; they are never truncated,
+     because a truncated citation is an unusable citation. */
+  overflow-wrap: anywhere;
+}
+
+.railMark {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.railLabel {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+}
+
+.lineBody {
+  padding-left: 22px;
+  color: var(--ink);
+}
+
+.quoteFound {
+  font-weight: var(--weight-ui);
+}
+
+/* FABRICATED: struck through, warm red, drawn once. The only animation on the page. */
+.struck {
+  position: relative;
+  color: var(--muted);
+}
+
+.struck::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 52%;
+  height: 1.5px;
+  background: var(--fabricated);
+}
+
+/* UNVERIFIABLE: no fill, dashed rule, no hue. Quiet by form, not by faintness. */
+.unverifiableRule {
+  border: none;
+  border-top: 1px dashed var(--line-strong);
+  margin: 5px 0 0;
+}
+
+/* ---------- status ---------- */
+.status {
+  margin-top: 48px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+}
+
+.statusBlock h3 {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  /* h3 has no weight of its own, so without this it silently renders at the UA default
+     700 — measured. Every heading on this page states its weight explicitly. */
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 10px;
+}
+
+.statusBlock ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.62;
+  color: var(--muted);
+}
+
+.statusBlock li {
+  margin-bottom: 5px;
+}
+
+.done {
+  color: var(--verified);
+  font-weight: var(--weight-ui);
+}
+
+.pending {
+  color: var(--misattributed);
+  font-weight: var(--weight-ui);
+}
+
+@media (max-width: 720px) {
+  .page { padding: 24px 16px 64px; }
+  .thesis h2 { font-size: 26px; }
+  .brief { padding: 20px 16px 20px 0; }
+  /* At narrow widths the rail moves above the line rather than squeezing the text. */
+  .auditedLine { grid-template-columns: 1fr; }
+  .rail {
+    flex-direction: row;
+    align-items: center;
+    padding: 0 0 8px;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 10px;
+  }
+  .lineBody { padding-left: 0; }
+}

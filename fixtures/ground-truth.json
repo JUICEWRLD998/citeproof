@@ -1,0 +1,138 @@
+{
+  "$comment": [
+    "GROUND TRUTH — authored independently of the implementation, then verified against primary source.",
+    "Every expected verdict below was checked against the live corpus on corpusVerifiedAt BEFORE the",
+    "engine existed. Quotes that turned out to be absent were the ones we WANTED absent (misattribution,",
+    "fabrication) — two drafted quotes were found to be not-in-corpus and one was corrected, and that",
+    "correction is recorded in each entry's `verified` field rather than silently dropped.",
+    "",
+    "Re-verify with: node .recon/probe-fixtures.mjs"
+  ],
+  "brief": "fixtures/briefs/motion-to-dismiss.txt",
+  "corpus": "Harvard Caselaw Access Project bulk static (static.case.law)",
+  "corpusVerifiedAt": "2026-09-22",
+  "coverageBoundary": {
+    "us": { "maxVolume": 572, "latestDecisionDate": "2014-06-03" },
+    "f3d": { "maxVolume": 935, "latestDecisionDate": "2019-09-09" },
+    "f-supp-3d": { "maxVolume": 392, "latestDecisionDate": "2019-08-19" },
+    "f-supp-2d": { "maxVolume": 999, "latestDecisionDate": "2014-08-21" },
+    "f2d": { "maxVolume": 999, "latestDecisionDate": "1993-10-29" },
+    "f-supp": { "maxVolume": 999, "latestDecisionDate": "1998-04-24" },
+    "note": "Any citation past a reporter's boundary is UNVERIFIABLE_COVERAGE, never FABRICATED."
+  },
+  "precedenceRule": [
+    "1. If the quotation is FOUND in the cited case  -> VERIFIED (even at low OCR confidence).",
+    "2. If the quotation is FOUND in a different case -> MISATTRIBUTED (positive find wins).",
+    "3. If ABSENT and the cited case's OCR confidence < OCR_CONFIDENCE_FLOOR -> UNVERIFIABLE_LOW_CONFIDENCE.",
+    "4. If ABSENT and the citation is past the corpus boundary -> UNVERIFIABLE_COVERAGE.",
+    "5. If ABSENT, in coverage, confidence adequate -> FABRICATED."
+  ],
+  "expectations": [
+    {
+      "id": "E1",
+      "line": 1,
+      "why": "Control: a true holding correctly cited. If this line does not come back VERIFIED the tool is broken.",
+      "citationRaw": "347 U.S. 483",
+      "pincite": 495,
+      "caseName": "Brown v. Board of Education",
+      "quote": "Separate educational facilities are inherently unequal.",
+      "expectedVerdict": "VERIFIED",
+      "source": "us/347/cases/0483-01.json",
+      "verified": {
+        "foundAtCharOffset": 9564,
+        "quoteLength": 55,
+        "ocrConfidence": 0.664,
+        "decisionDate": "1954-05-17",
+        "allCitations": ["347 U.S. 483", "98 L. Ed. 2d 873", "74 S. Ct. 686", "1954 U.S. LEXIS 2094", "SCDB 1953-069"],
+        "note": "Found with a capital S. The lowercase form returns ABSENT — this single case is the whole reason the normalisation layer exists."
+      },
+      "trapsExercised": ["capitalisation"]
+    },
+    {
+      "id": "E2",
+      "line": 2,
+      "why": "THE HERO LINE. A real, verbatim sentence attributed to the wrong case. Every competitor reports a bare failure here; we must report where it actually lives.",
+      "citationRaw": "163 U.S. 537",
+      "pincite": 544,
+      "caseName": "Plessy v. Ferguson",
+      "quote": "Separate educational facilities are inherently unequal.",
+      "expectedVerdict": "MISATTRIBUTED",
+      "expectedTrueHome": "347 U.S. 483",
+      "source": "us/163/cases/0537-01.json",
+      "verified": {
+        "absentFromCitedCase": true,
+        "presentIn": "us/347/cases/0483-01.json at char 9564",
+        "citedCaseOcrConfidence": 0.434,
+        "citedCaseDecisionDate": "1896-05-18",
+        "citedCaseOpinions": ["majority", "dissent"],
+        "note": "Brown's holding is ABSENT from Plessy (verified directly). Plessy's OCR is 0.434, below the floor — but the MISATTRIBUTED verdict wins anyway, because rule 2 is a POSITIVE find. That ordering is deliberate: finding the sentence elsewhere is strong evidence, and the low-confidence gate exists only to prevent unsupported accusations."
+      },
+      "trapsExercised": ["misattribution", "low-confidence-suppressed-accusation"]
+    },
+    {
+      "id": "E3",
+      "line": 3,
+      "why": "An entirely invented citation. Must be FABRICATED, with a populated resolution log as the receipt.",
+      "citationRaw": "999 U.S. 1234",
+      "pincite": 1240,
+      "caseName": "Anderson v. Liberty Lobby, Inc.",
+      "quote": "summary judgment is warranted only where the evidence is such that no reasonable jury could return a verdict for the nonmoving party",
+      "expectedVerdict": "FABRICATED",
+      "source": null,
+      "verified": {
+        "metadataProbe": "us/999/CasesMetadata.json -> HTTP 404",
+        "noteTwoThings": "(a) `us` has 572 volumes, so page 1234 of volume 999 cannot exist — a cheap structural check worth adding. (b) The quote is a PARAPHRASE of a real Anderson v. Liberty Lobby holding (477 U.S. 242, ocr 0.695) that our string check does NOT find in that case either. That is realistic: fabricated citations are typically attached to paraphrased-as-quoted text. Ground truth is FABRICATED because the CITATION is fabricated, not because the sentence is new."
+      },
+      "trapsExercised": ["fabrication", "fabricated-cite-with-real-case-name"]
+    },
+    {
+      "id": "E4",
+      "line": 4,
+      "why": "The coverage boundary surfaced as a verdict. This case is real, famous, and POST-DATES the corpus. A tool that is not boundary-aware calls it invented.",
+      "citationRaw": "678 F. Supp. 3d 443",
+      "pincite": 452,
+      "caseName": "Mata v. Avianca, Inc.",
+      "quote": "counsel bears a duty of candor to the tribunal that is independent of any duty owed to the client",
+      "expectedVerdict": "UNVERIFIABLE_COVERAGE",
+      "source": null,
+      "verified": {
+        "metadataProbe": "f-supp-3d/678/CasesMetadata.json -> HTTP 404",
+        "fSupp3dBoundary": "maxVolume 392, latest decision_date 2019-08-19",
+        "decisionDateOfRealCase": "2023",
+        "note": "Mata v. Avianca is the real 2023 AI-sanctions case that motivated this product. CAP static stops at 2019-08-19 for f-supp-3d, so we CANNOT verify it. Reporting FABRICATED here would be the tool's worst possible failure — accusing the most important case in its own origin story. This fixture exists to make that failure impossible."
+      },
+      "trapsExercised": ["coverage-boundary", "modern-case"]
+    },
+    {
+      "id": "E5",
+      "line": 5,
+      "why": "An absent quote attributed to a badly-OCR'd historical case. Must refuse to accuse.",
+      "citationRaw": "163 U.S. 537",
+      "pincite": 556,
+      "caseName": "Plessy v. Ferguson",
+      "quote": "the Fourteenth Amendment is not confined to the correction of legislation that operates directly upon the colored race alone",
+      "expectedVerdict": "UNVERIFIABLE_LOW_CONFIDENCE",
+      "source": "us/163/cases/0537-01.json",
+      "verified": {
+        "absentFromCitedCase": true,
+        "citedCaseOcrConfidence": 0.434,
+        "belowFloor": true,
+        "draftingCorrection": "This sentence was drafted as a plausible Plessy quote and then CHECKED. It is NOT in the corpus (verified absent, both strict and loose forms). It was retained as the low-confidence fixture precisely because it is absent: absent + ocr 0.434 < floor 0.5 is the exact condition the gate exists for. Had it been present, it would now be a VERIFIED fixture instead."
+      },
+      "trapsExercised": ["low-confidence-suppressed-accusation"]
+    },
+    {
+      "id": "E6",
+      "line": null,
+      "why": "Reserved: a citation whose case resolves but whose record carries no casebody text, so the quote can be neither confirmed nor denied.",
+      "expectedVerdict": "UNVERIFIABLE_UNRESOLVED",
+      "status": "PENDING_SOURCE",
+      "note": "NOT YET WIRED INTO THE BRIEF. We have not yet sourced a real case with a metadata record but an empty/absent casebody, and inventing one would defeat the purpose of independent ground truth. Phase 1 must find a genuine instance (probe `casebody` presence across a volume's cases) and add the paragraph to the brief at that point. Until then the corresponding test is registered with `it.todo` so the gap is visible in CI output rather than silently missing."
+    }
+  ],
+  "knownGaps": [
+    "E6 has no sourced fixture yet (see above).",
+    "Only reporters us / f2d / f3d / f-supp / f-supp-2d / f-supp-3d were measured. The slug map in Phase 1 must confirm the rest empirically rather than assume the naming pattern.",
+    "Single-brief ground truth. A second brief (ideally a real sanitised filing) should be added in Phase 4 to reduce overfitting to these six lines."
+  ]
+}

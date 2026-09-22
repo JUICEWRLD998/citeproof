@@ -1,0 +1,47 @@
+@import "../styles/tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-weight: var(--weight-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #f9b598;
+  color: var(--ink);
+}
+
+/* Focus is never removed — it is restyled. A keyboard user must always see where they are. */
+:focus-visible {
+  outline: 3px solid var(--accent-ink);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+a {
+  /* --accent-ink, not --accent: the fill value is only 3.01:1 as text. */
+  color: var(--accent-ink);
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--accent-ink-hover);
+}
+
+code,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
