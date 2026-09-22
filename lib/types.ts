@@ -85,8 +85,40 @@ export interface ResolvedCase {
   sha256: string;
   /** 0..1. Low values gate verdicts toward UNVERIFIABLE_LOW_CONFIDENCE. */
   ocrConfidence: number;
-  /** Verbatim opinion text, opinions joined in order. */
+  /** Verbatim opinion text, opinions joined in order, then head_matter. */
   text: string;
+  /**
+   * True when the corpus record carries NO opinion body — `casebody.opinions` is empty or
+   * holds no non-whitespace text.
+   *
+   * Added in Phase 1 from a measured finding, not from speculation. `.recon/probe-e6.mjs`
+   * swept 152 cases across 13 reporters and found the condition is real and not rare: in
+   * `us/572` alone, 41 of 48 sampled records have empty `opinions` — they are the Supreme
+   * Court's orders lists, where each short disposition is a separate record with a docket
+   * line and no opinion text.
+   *
+   * Phase 4 MUST consult this before returning FABRICATED. A quotation absent from a record
+   * with no opinion body cannot be called fabricated, because the part we would have searched
+   * is precisely the part that is missing. Absent here means UNVERIFIABLE_UNRESOLVED.
+   *
+   * This is a FLAG, not a thrown error, and deliberately so: the CASE resolves perfectly well
+   * and the UI still needs its name and citation to show. Throwing would also be unsafe —
+   * a resolved-but-in-coverage failure that reaches the precedence rule as "unresolved" would
+   * be reported as FABRICATED, i.e. as an accusation. E6's own test is registered as
+   * "case resolves but carries no casebody text", which is this flag.
+   *
+   * `text` may still be non-empty when this is true: `head_matter` holds the caption, and its
+   * length varies enormously. Re-verified at source 2026-09-22: `392 F. Supp. 3d 138`
+   * (Intellectual Ventures I v. Lenovo, D. Mass.) has one majority opinion with an empty text
+   * and 6,397 chars of `head_matter`. A sweep of 56 empty-opinion records measured the
+   * distribution as bimodal — docket-only captions clustered at 132..309 chars, then a gap, then
+   * 539 / 648 / 685, then 6,397 — but NO threshold has been chosen from it and this file does
+   * not set one. The matcher searches all of `text`, so a quotation found in `head_matter` still
+   * yields VERIFIED; a positive find always wins. This flag only governs what to do when the
+   * quotation is NOT found, and that decision is tracked as an open question in docs/LIMITS.md
+   * rather than guessed at here.
+   */
+  opinionBodyMissing: boolean;
 }
 
 export interface AuditResult {

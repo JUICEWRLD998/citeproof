@@ -5,7 +5,6 @@ import {
   assembleOpinionText,
   describeMatches,
   findCasesByCitation,
-  hasUsableText,
   isCuratedFixtureRecord,
   parseCasePayload,
   parseCuratedFixture,
@@ -293,15 +292,10 @@ export class Corpus {
 
     const payload = raw as CapCasePayload;
 
-    // A resolved-but-empty record is E6, and it has its OWN error kind. Returning an empty
-    // text here would let Phase 4 reach a confident FABRICATED from a parse artefact.
-    if (!hasUsableText(payload)) {
-      throw new CorpusFailure({
-        kind: "Unresolved",
-        message: `${payload.name_abbreviation ?? payload.name ?? "case"} resolved but carries no casebody text — the quotation can be neither confirmed nor denied`,
-      });
-    }
-
+    // A record with no opinion body RESOLVES — it does not throw. `parseCasePayload` sets
+    // `opinionBodyMissing`, and Phase 4 branches on that before the precedence rule can reach
+    // FABRICATED. Throwing here would be actively unsafe: a resolved-but-in-coverage failure
+    // that reaches the rule as "unresolved" is reported as an accusation.
     const text = assembleOpinionText(payload);
     const fallback = payload.analysis?.sha256 ?? CorpusCache.hashText(text);
     return parseCasePayload(payload, { fallbackSha256: fallback });

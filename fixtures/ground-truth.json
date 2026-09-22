@@ -126,13 +126,41 @@
       "line": null,
       "why": "Reserved: a citation whose case resolves but whose record carries no casebody text, so the quote can be neither confirmed nor denied.",
       "expectedVerdict": "UNVERIFIABLE_UNRESOLVED",
-      "status": "PENDING_SOURCE",
-      "note": "NOT YET WIRED INTO THE BRIEF. We have not yet sourced a real case with a metadata record but an empty/absent casebody, and inventing one would defeat the purpose of independent ground truth. Phase 1 must find a genuine instance (probe `casebody` presence across a volume's cases) and add the paragraph to the brief at that point. Until then the corresponding test is registered with `it.todo` so the gap is visible in CI output rather than silently missing."
+      "status": "PENDING_DEFINITION",
+      "source": "f-supp-3d/392/cases/0138-01.json",
+      "candidate": {
+        "citation": "392 F. Supp. 3d 138",
+        "caseName": "Intellectual Ventures I, LLC v. Lenovo Grp. Ltd.",
+        "court": "D. Mass.",
+        "decisionDate": "2019-07-18",
+        "caseFile": "0138-01",
+        "sha256": "cd7b9ab7588c0335fdddb97916bd6dc2b7db7c1cdf25b0a826297369f855cba8",
+        "verifiedAtSource": {
+          "opinions": [{ "type": "majority", "textLen": 0 }],
+          "headMatterChars": 6397,
+          "uniqueCite": true,
+          "matchesInVolume": 1,
+          "citationType": "official",
+          "note": "Sourced by .recon/probe-e6.mjs and re-verified by hand 2026-09-22. Its only citation is official-type and no other record in f-supp-3d/392 shares it, so unlike the orders-list candidates this citation DOES identify one case."
+        },
+        "quoteToPlant": "the court declines to reconsider its prior construction of the asserted claims"
+      },
+      "note": [
+        "SOURCE FOUND; THE VERDICT DEFINITION IS NOT. This entry was previously recorded as 'PENDING_SOURCE' with the note that we had not yet sourced a real case. That is no longer true and the old note is replaced here rather than left standing.",
+        "",
+        "The open question is what 'no casebody text' means, and it changes the verdict:",
+        "  STRICT (text = opinions[].text alone): the case has no opinion -> UNVERIFIABLE_UNRESOLVED.",
+        "  LOOSE (search all of text, head_matter included): head_matter is 6,397 chars, so the quoted sentence should be searched there -> absent would mean more than nothing.",
+        "Choosing between them needs a threshold, and implementation.md Phase 4 requires a threshold with a RECORDED NUMBER rather than a vibe. Reporting E6 as wired before that choice is made would be exactly that vibe. The full evidence and the measured head_matter length distribution (n=56, bimodal: docket-only captions at 132-309, then 539/648/685, then 6397) are in docs/LIMITS.md section 4.",
+        "",
+        "NOT YET WIRED INTO THE BRIEF, for the same reason: the paragraph cannot be written until the verdict it should produce is settled. The test stays registered with it.todo so the gap is visible in CI output rather than silently missing."
+      ],
+      "invariant": "A quotation ABSENT from a record with opinionBodyMissing === true must never yield FABRICATED. Phase 4 must branch on ResolvedCase.opinionBodyMissing before the precedence rule reaches rule 5."
     }
   ],
   "knownGaps": [
-    "E6 has no sourced fixture yet (see above).",
-    "Only reporters us / f2d / f3d / f-supp / f-supp-2d / f-supp-3d were measured. The slug map in Phase 1 must confirm the rest empirically rather than assume the naming pattern.",
+    "E6's source is now found (392 F. Supp. 3d 138) but the verdict definition is unresolved — see E6.status PENDING_DEFINITION and docs/LIMITS.md section 4.",
+    "The slug map in Phase 1 was measured rather than assumed: 404 reporters were enumerated and the naming pattern proved NOT uniform (us, f2d, so2d, l-ed-2d, cal-2d and f-appx all coexist; every pattern-derived slug 404'd). Only 9 reporters have measured boundaries in fixtures/coverage.json — the rest are unmapped and therefore UNVERIFIABLE_COVERAGE.",
     "Single-brief ground truth. A second brief (ideally a real sanitised filing) should be added in Phase 4 to reduce overfitting to these six lines."
   ]
 }

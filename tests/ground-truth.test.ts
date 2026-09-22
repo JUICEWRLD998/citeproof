@@ -43,7 +43,9 @@ function itemFrom(e: Expectation): AuditItem {
 }
 
 const expectations: Expectation[] = (gt.expectations as Expectation[]).filter(
-  (e) => e.status !== "PENDING_SOURCE",
+  // Anything still pending — whether on a source or on a definition — is excluded, so the
+  // suite names the gap rather than failing on an expectation nobody has settled yet.
+  (e) => !e.status?.startsWith("PENDING"),
 );
 
 describe("ground truth verdicts (fixtures/ground-truth.json)", () => {
@@ -89,5 +91,9 @@ describe("ground truth verdicts (fixtures/ground-truth.json)", () => {
   }
 
   // Registered so the gap shows in CI output instead of being silently absent.
+  // The SOURCE is now found — 392 F. Supp. 3d 138, Intellectual Ventures I v. Lenovo, whose
+  // majority opinion is empty. What is unresolved is the DEFINITION: whether a record with an
+  // empty `opinions` array but 6,397 chars of `head_matter` counts as carrying no text. That
+  // choice needs a threshold with a recorded number. See docs/LIMITS.md section 4.
   it.todo("E6 — UNVERIFIABLE_UNRESOLVED: case resolves but carries no casebody text");
 });

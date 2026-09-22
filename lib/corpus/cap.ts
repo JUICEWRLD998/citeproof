@@ -290,6 +290,7 @@ export function parseCasePayload(payload: CapCasePayload, opts: ParseOptions = {
     sha256,
     ocrConfidence: typeof rawConfidence === "number" ? rawConfidence : 1,
     text,
+    opinionBodyMissing: !hasUsableText(payload),
   };
 }
 
@@ -339,5 +340,7 @@ export function parseCuratedFixture(rec: CuratedFixtureRecord): ResolvedCase {
     // of poor text quality.
     ocrConfidence: typeof rec.ocrConfidence === "number" ? rec.ocrConfidence : 1,
     text: rec.text ?? "",
+    // A curated copy would not have been curated if it carried no text.
+    opinionBodyMissing: !(rec.text ?? "").trim(),
   };
 }

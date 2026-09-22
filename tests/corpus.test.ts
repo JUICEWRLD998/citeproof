@@ -249,15 +249,27 @@ describe("corpus: out-of-coverage is a TYPED signal, never an untyped crash", ()
     expect(detail.kind).toBe("Unresolved");
   });
 
-  it("reports Unresolved for a case that resolves but carries no casebody (E6 condition)", async () => {
+  it("FLAGS a case that resolves but carries no opinion body, instead of throwing", async () => {
+    // E6. The case resolves perfectly well — the UI still needs its name and citation — so this
+    // is a flag, not an error. Throwing would also be unsafe: a resolved-but-in-coverage failure
+    // reaching the precedence rule as "unresolved" becomes FABRICATED, i.e. an accusation.
     const dir = mkdtempSync(join(tmpdir(), "citeproof-e6-"));
     try {
-      const empty = { ...({} as CapCasePayload), citations: [{ cite: "163 U.S. 537" }], file_name: "0001-01" };
+      const docketOnly: CapCasePayload = {
+        name_abbreviation: "Biton v. Lippert",
+        name: "BITON v. LIPPERT",
+        decision_date: "2014-05-05",
+        file_name: "1110-01",
+        citations: [{ type: "official", cite: "572 U.S. 1110" }],
+        analysis: { sha256: "e".repeat(64) },
+        casebody: {
+          opinions: [{ type: "majority", text: "" }],
+          head_matter: "Crystal BITON, petitioner,\nv.\nMichael LIPPERT, et al.\nNo. 13-7567.",
+        },
+      };
       const corpus = new Corpus({
         fetchImpl: (async (url: string) => {
-          const body = url.endsWith("CasesMetadata.json")
-            ? [{ ...empty, analysis: { sha256: "e".repeat(64) } }]
-            : empty;
+          const body = url.endsWith("CasesMetadata.json") ? [docketOnly] : docketOnly;
           return { status: 200, text: async () => JSON.stringify(body) } as unknown as Response;
         }) as unknown as typeof fetch,
         cachePaths: {
@@ -268,9 +280,62 @@ describe("corpus: out-of-coverage is a TYPED signal, never an untyped crash", ()
         sleepImpl: async () => {},
         minIntervalMs: 0,
       });
-      const detail = await failureOf(corpus.getCaseByCitation("163 U.S. 537"));
-      expect(detail.kind).toBe("Unresolved");
-      expect(detail.message).toContain("no casebody");
+
+      const resolved = await corpus.getCaseByCitation("572 U.S. 1110");
+      expect(resolved.opinionBodyMissing).toBe(true);
+      // Still resolved with an identity, which is the whole point of flagging rather than throwing.
+      expect(resolved.caseName).toContain("Biton");
+      // head_matter still reaches the text the matcher searches, so a positive find stays reachable.
+      expect(resolved.text).toContain("Michael LIPPERT");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does NOT flag a case whose opinion body is present", async () => {
+    const corpus = new Corpus();
+    const brown = await corpus.getCaseByCitation("347 U.S. 483");
+    expect(brown.opinionBodyMissing).toBe(false);
+  });
+
+  it("searches head_matter, so a find there still counts (measured: 6,397 chars at source)", async () => {
+    // Re-verified by hand 2026-09-22: f-supp-3d/392/cases/0138-01.json (Intellectual Ventures I
+    // v. Lenovo) has one majority opinion with an empty text and 6,397 chars of head_matter. The
+    // question of whether an ABSENT quotation there is UNVERIFIABLE or testable is unresolved and
+    // deliberately not decided here — but a PRESENT one must still be found.
+    const dir = mkdtempSync(join(tmpdir(), "citeproof-hm-"));
+    try {
+      const payload: CapCasePayload = {
+        name_abbreviation: "Intellectual Ventures I, LLC v. Lenovo Grp. Ltd.",
+        decision_date: "2019-07-18",
+        file_name: "0138-01",
+        citations: [{ type: "official", cite: "392 F. Supp. 3d 138" }],
+        analysis: { sha256: "1".repeat(64) },
+        casebody: {
+          opinions: [{ type: "majority", text: "" }],
+          head_matter: `${"preamble text. ".repeat(420)}the court declines to reconsider its prior construction of the asserted claims`,
+        },
+      };
+      const corpus = new Corpus({
+        fetchImpl: (async (url: string) => {
+          const body = url.endsWith("CasesMetadata.json") ? [payload] : payload;
+          return { status: 200, text: async () => JSON.stringify(body) } as unknown as Response;
+        }) as unknown as typeof fetch,
+        cachePaths: {
+          fixtures: join(dir, "none"),
+          runtime: join(dir, "corpus"),
+          runtimeIndex: join(dir, "index"),
+        },
+        sleepImpl: async () => {},
+        minIntervalMs: 0,
+      });
+
+      const resolved = await corpus.getCaseByCitation("392 F. Supp. 3d 138");
+      expect(resolved.opinionBodyMissing).toBe(true);
+      // Sized to the real record (6,397 chars of head_matter), so the test exercises the
+      // magnitude the design has to cope with rather than a convenient small number.
+      expect(resolved.text.length).toBeGreaterThan(6_000);
+      expect(resolved.text).toContain("declines to reconsider its prior construction");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
