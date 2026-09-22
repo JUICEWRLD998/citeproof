@@ -110,6 +110,21 @@ export interface AuditResult {
 export type CorpusError =
   | { kind: "OutOfCoverage"; message: string; boundary: string }
   | { kind: "Unresolved"; message: string }
+  /**
+   * Added in Phase 1 after a MEASURED finding, because collapsing it into "Unresolved" would
+   * have been a correctness bug, not a simplification.
+   *
+   * Exact `citations[].cite` matching is NOT unique in CAP. Measured in `us/572`
+   * (`.recon/probe-cite-ambiguity.mjs`): 803 of 893 distinct cites are claimed by more than
+   * one record, max 27. The collisions are DIFFERENT cases sharing a page number — Supreme
+   * Court orders lists print many short dispositions on one page, one record each
+   * (`1082-01`, `1082-02`, ...). So `572 U.S. 1110` legitimately matches 13 different cases.
+   *
+   * This must not be "Unresolved": by the precedence rule an unresolved-but-in-coverage
+   * citation becomes FABRICATED, which would mean the tool accusing a real case because two
+   * real cases share a page. Ambiguity is a reason to refuse to adjudicate, never to accuse.
+   */
+  | { kind: "Ambiguous"; message: string; candidates: string[] }
   | { kind: "Network"; message: string }
   | { kind: "NotImplemented"; message: string };
 

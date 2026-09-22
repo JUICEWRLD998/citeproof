@@ -1,0 +1,65 @@
+{
+  "$provenance": {
+    "source": "https://static.case.law/ reporter index + per-volume CasesMetadata.json",
+    "measuredBy": ".recon/probe-slugs.mjs",
+    "measuredAt": "2026-09-22T20:58:55.821Z",
+    "reportersEnumerated": 404,
+    "note": "MEASURED, not assumed. Regenerate with probe-slugs.mjs then this script. lib/corpus/coverage.ts is the only reader."
+  },
+  "reporters": {
+    "us": {
+      "volumes": 572,
+      "maxVolume": 572,
+      "latestDecisionDate": "2014-06-03",
+      "maxPageObserved": 2722
+    },
+    "f": {
+      "volumes": 300,
+      "maxVolume": 300,
+      "latestDecisionDate": "1924-09-13",
+      "maxPageObserved": 1007
+    },
+    "f2d": {
+      "volumes": 999,
+      "maxVolume": 999,
+      "latestDecisionDate": "1993-10-29",
+      "maxPageObserved": 1573
+    },
+    "f3d": {
+      "volumes": 935,
+      "maxVolume": 935,
+      "latestDecisionDate": "2019-09-09",
+      "maxPageObserved": 1370
+    },
+    "f-supp": {
+      "volumes": 997,
+      "maxVolume": 999,
+      "latestDecisionDate": "1998-04-24",
+      "maxPageObserved": 1473
+    },
+    "f-supp-2d": {
+      "volumes": 999,
+      "maxVolume": 999,
+      "latestDecisionDate": "2014-08-21",
+      "maxPageObserved": 1383
+    },
+    "f-supp-3d": {
+      "volumes": 386,
+      "maxVolume": 392,
+      "latestDecisionDate": "2019-08-19",
+      "maxPageObserved": 1326
+    },
+    "f-appx": {
+      "volumes": 714,
+      "maxVolume": 714,
+      "latestDecisionDate": "2018-03-16",
+      "maxPageObserved": 1025
+    },
+    "cal-2d": {
+      "volumes": 71,
+      "maxVolume": 71,
+      "latestDecisionDate": "1969-10-21",
+      "maxPageObserved": 1235
+    }
+  }
+}
