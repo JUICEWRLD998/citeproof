@@ -92,13 +92,14 @@
       "citationRaw": "678 F. Supp. 3d 443",
       "pincite": 452,
       "caseName": "Mata v. Avianca, Inc.",
-      "quote": "counsel bears a duty of candor to the tribunal that is independent of any duty owed to the client",
+      "quote": "counsel bears a duty of candor to the tribunal that is independent of any duty owed to the client.",
       "expectedVerdict": "UNVERIFIABLE_COVERAGE",
       "source": null,
       "verified": {
         "metadataProbe": "f-supp-3d/678/CasesMetadata.json -> HTTP 404",
         "fSupp3dBoundary": "maxVolume 392, latest decision_date 2019-08-19",
         "decisionDateOfRealCase": "2023",
+        "draftingCorrection": "Phase 2 corrected this quote to include its trailing period, per this file's own convention of recording corrections rather than dropping them. The brief reads `...owed to the client.\"` — the period sits INSIDE the closing quote mark, so the document's quotation includes it. The original entry omitted it, which made this the only one of the five quotes whose trailing punctuation disagreed with the brief (E1, E2 and E5 all include it; E3's period legitimately falls outside the quote). The expected VERDICT is unchanged — only the quoted bytes were aligned to the source. Nothing about the coverage-boundary reasoning below is affected.",
         "note": "Mata v. Avianca is the real 2023 AI-sanctions case that motivated this product. CAP static stops at 2019-08-19 for f-supp-3d, so we CANNOT verify it. Reporting FABRICATED here would be the tool's worst possible failure — accusing the most important case in its own origin story. This fixture exists to make that failure impossible."
       },
       "trapsExercised": ["coverage-boundary", "modern-case"]
@@ -110,14 +111,15 @@
       "citationRaw": "163 U.S. 537",
       "pincite": 556,
       "caseName": "Plessy v. Ferguson",
-      "quote": "the Fourteenth Amendment is not confined to the correction of legislation that operates directly upon the colored race alone",
+      "quote": "the Fourteenth Amendment is not confined to the correction of legislation that operates directly upon the colored race alone.",
       "expectedVerdict": "UNVERIFIABLE_LOW_CONFIDENCE",
       "source": "us/163/cases/0537-01.json",
       "verified": {
         "absentFromCitedCase": true,
         "citedCaseOcrConfidence": 0.434,
         "belowFloor": true,
-        "draftingCorrection": "This sentence was drafted as a plausible Plessy quote and then CHECKED. It is NOT in the corpus (verified absent, both strict and loose forms). It was retained as the low-confidence fixture precisely because it is absent: absent + ocr 0.434 < floor 0.5 is the exact condition the gate exists for. Had it been present, it would now be a VERIFIED fixture instead."
+        "draftingCorrection": "This sentence was drafted as a plausible Plessy quote and then CHECKED. It is NOT in the corpus (verified absent, both strict and loose forms). It was retained as the low-confidence fixture precisely because it is absent: absent + ocr 0.434 < floor 0.5 is the exact condition the gate exists for. Had it been present, it would now be a VERIFIED fixture instead.",
+        "punctuationCorrection": "Phase 2 added the trailing period, for the same reason as E4. The brief reads `...colored race alone.\" Plessy v. Ferguson` — the period falls INSIDE the closing quote mark, so the document's quotation carries it. The original entry omitted it, making it the second of two quotes whose trailing punctuation disagreed with the brief. E1, E2 and E4 all include the period; E3's falls legitimately outside its quote mark. Aligned to the document, per the same record-the-correction convention. The expected VERDICT is unchanged."
       },
       "trapsExercised": ["low-confidence-suppressed-accusation"]
     },
