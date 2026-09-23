@@ -35,6 +35,21 @@ export interface Span {
   end: number;
 }
 
+/**
+ * Why a citation is out of corpus coverage.
+ *
+ * Defined here, in the frozen contract, rather than in the implementation that computes it,
+ * because downstream verdict logic branches on it: `volume-implausible-for-year` is the ONE
+ * reason that is a positive structural claim rather than a refusal. Every other value means
+ * "we cannot reach it" and must never produce an accusation.
+ */
+export type OutOfCoverageWhy =
+  | "reporter-not-mapped"
+  | "volume-beyond-corpus"
+  | "page-beyond-volume"
+  | "decision-date-beyond-corpus"
+  | "volume-implausible-for-year";
+
 export interface Citation {
   /** Exactly as it appeared in the document. */
   raw: string;
@@ -140,7 +155,21 @@ export interface AuditResult {
 
 /** Thrown by the corpus layer when a citation resolves to nothing. Not a verdict. */
 export type CorpusError =
-  | { kind: "OutOfCoverage"; message: string; boundary: string }
+  /**
+   * `why` is machine-readable and load-bearing, added in Phase 3. The cascade must tell
+   * `volume-implausible-for-year` (a positive structural claim, measured against a recorder
+   * bound — the only out-of-coverage reason that can lead to FABRICATED) apart from every other
+   * reason, which is a refusal and must never accuse. Branching on this string rather than on
+   * the prose in `boundary` is deliberate: prose is for the human reading the receipt.
+   */
+  | {
+      kind: "OutOfCoverage";
+      message: string;
+      boundary: string;
+      why: OutOfCoverageWhy;
+      /** Present only for `volume-implausible-for-year`; the receipt's numbers. */
+      projection?: { ratio: number; bound: number; projectedVolume: number; atYear: number };
+    }
   | { kind: "Unresolved"; message: string }
   /**
    * Added in Phase 1 after a MEASURED finding, because collapsing it into "Unresolved" would

@@ -1,0 +1,88 @@
+{
+  "$provenance": {
+    "source": "https://static.case.law/<reporter>/1/CasesMetadata.json + fixtures/coverage.json",
+    "measuredBy": ".recon/probe-volume-rates.mjs",
+    "measuredAt": "2026-09-23T06:10:22.052Z",
+    "note": "MEASURED per-reporter volume growth, used to project whether a cited volume could exist yet. Read only by lib/resolve/cascade.ts."
+  },
+  "reporters": {
+    "us": {
+      "maxVolume": 572,
+      "latestDecisionDate": "2014-06-03",
+      "maxPageObserved": 2722,
+      "firstVolumeDate": "1789-12",
+      "firstVolumeFetchStatus": 200,
+      "volumesPerYear": 2.543
+    },
+    "f": {
+      "maxVolume": 300,
+      "latestDecisionDate": "1924-09-13",
+      "maxPageObserved": 1007,
+      "firstVolumeDate": "1880-04-20",
+      "firstVolumeFetchStatus": 200,
+      "volumesPerYear": 6.735
+    },
+    "f2d": {
+      "maxVolume": 999,
+      "latestDecisionDate": "1993-10-29",
+      "maxPageObserved": 1573,
+      "firstVolumeDate": "1924-11-17",
+      "firstVolumeFetchStatus": 200,
+      "volumesPerYear": 14.474
+    },
+    "f3d": {
+      "maxVolume": 935,
+      "latestDecisionDate": "2019-09-09",
+      "maxPageObserved": 1370,
+      "firstVolumeDate": "1993-09-22",
+      "firstVolumeFetchStatus": 200,
+      "volumesPerYear": 35.972
+    },
+    "f-supp": {
+      "maxVolume": 999,
+      "latestDecisionDate": "1998-04-24",
+      "maxPageObserved": 1473,
+      "firstVolumeDate": "1982-10-03",
+      "firstVolumeFetchStatus": 200,
+      "volumesPerYear": 64.149
+    },
+    "f-supp-2d": {
+      "maxVolume": 999,
+      "latestDecisionDate": "2014-08-21",
+      "maxPageObserved": 1383,
+      "firstVolumeDate": "1998-06-26",
+      "firstVolumeFetchStatus": 200,
+      "volumesPerYear": 61.784
+    },
+    "f-supp-3d": {
+      "maxVolume": 392,
+      "latestDecisionDate": "2019-08-19",
+      "maxPageObserved": 1326,
+      "firstVolumeDate": "2014-04-07",
+      "firstVolumeFetchStatus": 200,
+      "volumesPerYear": 72.863
+    },
+    "f-appx": {
+      "maxVolume": 714,
+      "latestDecisionDate": "2018-03-16",
+      "maxPageObserved": 1025,
+      "firstVolumeDate": "2001-01-23",
+      "firstVolumeFetchStatus": 200,
+      "volumesPerYear": 41.58
+    },
+    "cal-2d": {
+      "maxVolume": 71,
+      "latestDecisionDate": "1969-10-21",
+      "maxPageObserved": 1235,
+      "firstVolumeDate": "1934-11-02",
+      "firstVolumeFetchStatus": 200,
+      "volumesPerYear": 2.002
+    }
+  },
+  "projection": {
+    "bound": 1.5,
+    "boundDerivation": "Chosen from this probe's measured controls, not statistically derived: real citations top out at 1.151, E3 sits at 1.697, and the bound is set at 1.5 — above the geometric midpoint (1.398) because accusing a real case is the worse error and a safe miss is acceptable. Re-derive before trusting; see docs/LIMITS.md.",
+    "e3Ratio": 1.696880186216881,
+    "maxRealControlRatio": 1.151477096355919
+  }
+}
