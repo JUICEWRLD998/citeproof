@@ -13,6 +13,22 @@ interface Expectation {
   id: string;
   why: string;
   citationRaw: string;
+  /**
+   * Explicit citation coordinates, added Phase 4.
+   *
+   * The previous version DERIVED these by splitting `citationRaw` on spaces —
+   * `citationRaw.split(" ")[1]` for the reporter and `[2]` for the page. That is silently wrong
+   * for any reporter containing a space: `678 F. Supp. 3d 443` yielded reporter `"F."` and page
+   * `0`, so E4 (the real 2023 case, expected UNVERIFIABLE_COVERAGE) would have been refused for
+   * the wrong reason — an unparseable citation rather than a coverage boundary — and the test
+   * would have passed while asserting nothing. E3 additionally had no asserted year, without
+   * which the Phase 3 volume projection cannot fire and the fabricated citation is merely
+   * `unresolved-in-coverage`, i.e. resolved by a different mechanism than the one under test.
+   *
+   * Ground truth states its own coordinates now. A fixture that has to be re-derived by string
+   * surgery is a fixture that tests the surgery.
+   */
+  citation: { volume: number; reporter: string; page: number; pincite?: number; year?: number };
   pincite?: number;
   caseName: string;
   quote: string;
@@ -46,10 +62,11 @@ function itemFrom(e: Expectation, occurrence: number): AuditItem {
     id: e.id,
     citation: {
       raw: e.citationRaw,
-      volume: Number(e.citationRaw.split(" ")[0]),
-      reporter: e.citationRaw.split(" ")[1],
-      page: Number((e.citationRaw.split(" ")[2] ?? "").replace(/[^0-9]/g, "")),
-      pincite: e.pincite,
+      volume: e.citation.volume,
+      reporter: e.citation.reporter,
+      page: e.citation.page,
+      pincite: e.citation.pincite,
+      year: e.citation.year,
       span: { start: 0, end: 0 },
       shortForm: false,
     },

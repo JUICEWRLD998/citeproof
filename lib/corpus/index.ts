@@ -120,6 +120,8 @@ export class Corpus {
       throw new CorpusFailure({
         kind: "Unresolved",
         message: `"${citation}" is not a citation this corpus layer can read (expected "<volume> <reporter> <page>")`,
+        // 0 is honest: nothing was searched, so this must never support an accusation.
+        indexSize: 0,
       });
     }
     const year = opts.year ?? parseCitationYear(citation);
@@ -219,6 +221,7 @@ export class Corpus {
       throw new CorpusFailure({
         kind: "Unresolved",
         message: `"${key}" is inside CAP coverage but no case in ${coords.reporter} vol ${coords.volume} carries that citation`,
+        indexSize: metadata.length,
       });
     }
 
@@ -239,6 +242,9 @@ export class Corpus {
       throw new CorpusFailure({
         kind: "Unresolved",
         message: `"${key}" matched a record in ${coords.reporter} vol ${coords.volume} but that record names no case file`,
+        // A match WAS found, so the index was substantive — but it named no file to fetch, so
+        // there is no text to test the quotation against. Not an accusation.
+        indexSize: metadata.length,
       });
     }
 
@@ -311,6 +317,8 @@ export class Corpus {
         throw new CorpusFailure({
           kind: "Unresolved",
           message: `${resolved.caseName || "case"} resolved but its curated copy carries no opinion text`,
+          // We hold the record; it simply has no text. Nothing to accuse on.
+          indexSize: 0,
         });
       }
       return resolved;

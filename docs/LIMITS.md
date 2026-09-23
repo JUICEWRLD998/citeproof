@@ -232,3 +232,64 @@ only — it may populate the attempt log and add a judge or docket number — an
 `lib/resolve/cascade.ts` structurally cannot let it change an outcome. A throttle records as
 `skipped`, never as `miss`, so *"we could not ask"* can never read as *"the second source said no"*.
 
+## 10. The fuzzy matcher does not detect paraphrase, and the fixtures never test it
+
+§3.5 mandates a token-alignment fallback at **≥ 0.92**, and Phase 4 ships one. What it is worth is
+narrower than it sounds, and `.recon/probe-fuzzy-threshold.mjs` measures why.
+
+**It is not a paraphrase detector, and must not be treated as one.** The nearest false candidate in
+the whole fixture set is E3's fabricated quotation against the real Anderson sentence it paraphrases:
+similarity **0.447**. Real quotations measure **1.000** by the exact path. So the floor sits in a
+wide, empty gap, and the honest reading is that fuzzy matching is a tolerance for *OCR-scale and
+typo-scale* differences, not for rewriting.
+
+**Nothing in the ground truth exercises it.** Both true-positive fixtures are verbatim, so every one
+of them is resolved by the exact path; the sweep shows 2/2 true finds and 0/5 false matches at every
+floor from 0.92 down to 0.50. A feature the fixtures cannot reach would ship untested, so the fuzzy
+path has synthetic positive controls in `tests/verdicts.test.ts` — and one of them immediately found
+a real bug (§11).
+
+**The floor is length-sensitive, and that is a real property rather than a defect.** One changed word
+costs `1/n` of the score, so an 8-word quotation with a single change scores 0.875 and is *correctly
+rejected*, while a 25-word passage with the same single change scores 0.96 and matches. Short
+quotations therefore admit no paraphrase at all, which is the safe direction for a tool whose
+accusations must be defensible.
+
+**Not measured, and therefore not claimed:** no false-positive rate exists for this threshold across
+a large corpus. It is calibrated against six fixtures and a handful of controls.
+
+**The bug the synthetic controls found.** The first implementation scored a plain edit distance
+against a window deliberately longer than the quotation, so every padding token counted as an
+insertion: a genuine 25-token passage with one word changed scored **0.36** and the matcher returned
+`null` outright, making the ≥0.92 floor unreachable and the fuzzy path dead code. It was invisible to
+every fixture — which is exactly the situation described above — and one synthetic control caught it.
+Fixed by making the window's unaligned ends free (fitting alignment), and a control now asserts the
+returned span covers the real passage rather than the padded window.
+
+## 11. An empty volume index is not evidence of fabrication
+
+The precedence rule says an in-coverage citation that resolves to no case is `FABRICATED` — that is
+the fabricated-citation case the product exists to catch (`999 U.S. 1234` names a volume the corpus
+holds and matches nothing in it). But a volume index is the one thing this pipeline fetches
+wholesale, and `lib/corpus/cache.ts` warns it is **the layer to distrust first**: a truncated or
+failed fetch leaves an index that is empty or nearly so, and at the call site that is
+*indistinguishable* from "no such case".
+
+So emptiness is only evidence above a floor. `CorpusError.Unresolved` carries `indexSize`, and
+`MIN_INDEX_FOR_ACCUSATION = 3` (in `lib/types.ts`) decides:
+
+| indexSize observed | verdict | why |
+|---|---|---|
+| ≥ 3 | `FABRICATED` | a substantive index was searched and nothing in it claims the citation |
+| < 3 | `UNVERIFIABLE_UNRESOLVED` | far more likely a truncated fetch than a real citation |
+
+A real CAP volume index holds hundreds of records, so 3 is conservative. It is chosen on the same
+asymmetry as the OCR floor — a safe miss costs a missed finding, an accusation costs credibility —
+and it is **not statistically derived**. Both thresholds are known-open parameters.
+
+**Not covered by this rule:** a citation inside coverage and under the floor is still reported as
+`UNVERIFIABLE_UNRESOLVED`, not `UNVERIFIABLE_COVERAGE`. The citation is not *out* of what we hold;
+we read an index for it and could not trust the answer. The distinction is kept because the two
+reasons call for different fixes — one is a corpus boundary, the other is a fetch that failed.
+
+
