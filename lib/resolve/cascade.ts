@@ -34,6 +34,16 @@ export type CascadeOutcome =
       resolved: ResolvedCase;
       trace: ResolutionStep[];
       enrichment?: ClSearchHit;
+      /**
+       * Every hit the cross-check returned, kept so the verdict layer can mine them for a TRUE HOME
+       * without issuing a second search.
+       *
+       * Added in Phase 5 after a test caught the cost: the cascade's enrichment and the verdict
+       * layer's candidate discovery were each issuing their own query, so one audited item cost TWO
+       * requests against an anonymous budget of roughly 5/minute. One search per item, reused, is
+       * the only version of this that survives a real brief.
+       */
+      crossCheckHits?: ClSearchHit[];
     }
   | {
       state: "refused";
@@ -234,26 +244,33 @@ export async function resolveCitation(
   }
 
   let enrichment: ClSearchHit | undefined;
+  let crossCheckHits: ClSearchHit[] | undefined;
   if (opts.crossCheckEnabled && opts.crossCheck) {
-    enrichment = await crossCheck(citation, key, trace, opts.crossCheck);
+    const searched = await crossCheck(citation, key, trace, opts.crossCheck);
+    enrichment = searched.best;
+    crossCheckHits = searched.hits;
   }
 
-  return { state: "resolved", citation, resolved, trace, enrichment };
+  return { state: "resolved", citation, resolved, trace, enrichment, crossCheckHits };
 }
 
 /**
  * Record what CourtListener says, without ever letting it move the outcome.
  *
- * Its return value is passed through to the caller for the demo's attempt log and nothing else.
- * A budget or throttle failure is recorded as a `skipped` step, not an error: the cross-check is
- * enrichment, so "we did not ask" must never read as "the second source disagreed".
+ * Returns the winning hit AND the full list. The list is what the verdict layer needs to hunt for
+ * a true home, and returning it here is what keeps an audit to ONE search per item — see
+ * `CascadeOutcome.crossCheckHits`.
+ *
+ * A budget or throttle failure is recorded as a `skipped` step and yields no hits, rather than
+ * throwing: the cross-check is enrichment, so "we did not ask" must never read as "the second
+ * source disagreed".
  */
 async function crossCheck(
   citation: Citation,
   key: string,
   trace: ResolutionStep[],
   client: CourtListenerClient,
-): Promise<ClSearchHit | undefined> {
+): Promise<{ best?: ClSearchHit; hits: ClSearchHit[] }> {
   let hits: ClSearchHit[];
   try {
     hits = await client.searchByCitation(key);
@@ -264,7 +281,7 @@ async function crossCheck(
       outcome: "skipped",
       detail: err instanceof Error ? err.message : String(err),
     });
-    return undefined;
+    return { hits: [] };
   }
 
   if (!hits.length) {
@@ -274,7 +291,7 @@ async function crossCheck(
       outcome: "miss",
       detail: "no results — NOTE: this is NOT evidence the case does not exist; search is analyzed, not verbatim",
     });
-    return undefined;
+    return { hits: [] };
   }
 
   const carrying = hitsCarryingCitation(hits, key);
@@ -287,7 +304,7 @@ async function crossCheck(
         ? `${hits.length} results, ${carrying.length} carrying this citation itself (${carrying[0].caseName})`
         : `${hits.length} results, but NONE carries this citation in its own citation list — treated as no corroboration`,
   });
-  return carrying[0] ?? hits[0];
+  return { best: carrying[0] ?? hits[0], hits };
 }
 
 /**

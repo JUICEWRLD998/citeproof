@@ -1,7 +1,8 @@
 import type { AuditItem, AuditResult, ResolvedCase } from "../types";
 import { MIN_INDEX_FOR_ACCUSATION } from "../types";
 import { findBestMatch } from "../match";
-import { findTrueHome } from "../match/misattribution";
+import { rankTrueHomes, type MisattributionHit } from "../match/misattribution";
+import { verifyTrueHomeCandidates } from "../match/cl-candidates";
 import type { CachePaths } from "../corpus/cache";
 import { resolveCitation, type CascadeOptions, type CascadeOutcome } from "../resolve/cascade";
 import { decideVerdict, NO_CITATION_REASON, type MatchFacts, type Reachability } from "./verdicts";
@@ -20,6 +21,8 @@ export { decideVerdict, NO_CITATION_REASON, type MatchFacts, type Reachability }
 export interface AuditItemOptions extends CascadeOptions {
   /** Directory holding fixtures/corpus. Injectable so tests can pin the true-home scan. */
   cachePaths?: CachePaths;
+  /** How many CourtListener hits may be resolved against CAP for a true home. */
+  maxCrossCheckLookups?: number;
 }
 
 export async function auditItem(item: AuditItem, opts: AuditItemOptions = {}): Promise<AuditResult> {
@@ -57,22 +60,64 @@ export async function auditItem(item: AuditItem, opts: AuditItemOptions = {}): P
   // verified, and — critically — a hit in another case can never downgrade a VERIFIED.
   let trueHomeCase: ResolvedCase | null = null;
   let trueHomeSpan: MatchFacts["trueHome"] = null;
+  let candidateCases: ResolvedCase[] = [];
 
   if (!match && !cited.opinionBodyMissing) {
-    const hit = findTrueHome(item.quotation.raw, {
+    const exclude = [cited.citation, ...cited.allCitations];
+
+    // Stage 2 of the plan's cascade: mine the cross-check hits the CASCADE already fetched for a
+    // true home beyond the local corpus. No second search is issued here — `outcome.crossCheckHits`
+    // is reused, so one audited item costs one query rather than two against an anonymous budget of
+    // roughly 5/minute. `.recon/probe-misattribution.mjs` measured that CL returns cases that QUOTE
+    // a sentence rather than the origin, so everything found here is verified against CAP text
+    // before it counts (see lib/match/cl-candidates.ts).
+    let extraCandidates: MisattributionHit[] | undefined;
+    if (outcome.crossCheckHits?.length) {
+      const searched = await verifyTrueHomeCandidates(item.quotation.raw, {
+        hits: outcome.crossCheckHits,
+        corpus: opts.corpus,
+        exclude,
+        maxLookups: opts.maxCrossCheckLookups,
+      });
+      extraCandidates = searched.verified;
+      for (const attempt of searched.attempts) {
+        outcome.trace.push({
+          source: "courtlistener-search",
+          query: attempt.hit.citations[0] ?? "cross-check hit",
+          outcome: attempt.outcome === "verified" ? "hit" : "miss",
+          detail: `candidate ${attempt.outcome}: ${attempt.detail}`,
+        });
+      }
+    }
+
+    const ranked = rankTrueHomes(item.quotation.raw, {
       cachePaths: opts.cachePaths,
       // Excluding the cited case, by every citation it carries, is what keeps a correct citation
       // from being turned into an accusation by its own parallel reporters.
-      exclude: [cited.citation, ...cited.allCitations],
+      exclude,
+      extraCandidates,
     });
-    if (hit) {
-      trueHomeCase = hit.case;
-      trueHomeSpan = { citation: hit.case.citation, caseName: hit.case.caseName, span: hit.span };
+
+    if (ranked.home) {
+      trueHomeCase = ranked.home.case;
+      trueHomeSpan = {
+        citation: ranked.home.case.citation,
+        caseName: ranked.home.case.caseName,
+        span: ranked.home.span,
+      };
+      // Every exact candidate, best-first. `trueHome` is the first; the rest are the cases that
+      // merely QUOTE the sentence, and showing them is the honest form of "we found where it lives".
+      candidateCases = ranked.ranked.map((h) => h.case);
       outcome.trace.push({
         source: "cache",
         query: item.quotation.raw.slice(0, 60),
         outcome: "hit",
-        detail: `found verbatim in ${hit.case.caseName} (${hit.case.citation}), not the cited case`,
+        detail:
+          `found verbatim in ${ranked.ranked.length} local case(s); ranked ${ranked.home.case.caseName} ` +
+          `(${ranked.home.case.citation}, ${ranked.home.case.decisionDate}) earliest as the origin` +
+          (ranked.undated.length
+            ? `, excluding ${ranked.undated.length} undated candidate(s)`
+            : ""),
       });
     } else {
       outcome.trace.push({
@@ -110,6 +155,9 @@ export async function auditItem(item: AuditItem, opts: AuditItemOptions = {}): P
     // The scan's own ResolvedCase, carried through unchanged so the UI can render its text beside
     // the cited case's. Never reconstructed — a rebuilt case would lose the text the diff needs.
     trueHome: trueHomeCase ?? undefined,
+    // Only populated for MISATTRIBUTED, and only when a home was found. Empty for every other
+    // verdict, because "candidates" are meaningless when the quotation was not found elsewhere.
+    trueHomeCandidates: candidateCases.length ? candidateCases : undefined,
     resolutionTrace: outcome.trace,
   };
 }
