@@ -196,10 +196,13 @@ Kept deliberately: a plan that still asserts a falsified assumption misleads who
 | 9 | 1M context means no chunking needed | **CONFIRMED** | `context_length: 1048576` |
 | 10 | CAP reporter slugs follow a uniform naming pattern | **FALSIFIED** | 404 reporters enumerated. Every pattern-derived slug 404'd (`f-2d`, `a-2d`, `so-2d`, `l-ed`, `p-2d`, `b-r`), while `us`, `f2d`, `so2d`, `l-ed-2d`, `cal-2d`, `f-appx` and `misc2d` all coexist. A synthesiser produces confident wrong URLs |
 | 11 | An exact `citations[].cite` match identifies one case | **FALSIFIED** | `us/572`: 803 of 893 distinct cites are claimed by >1 record, max 27. The sharers are DIFFERENT cases — SCOTUS orders lists print many dispositions per page. But this is an `us` artefact, not corpus-wide: `f-supp-2d` and `f-supp-3d` measured **0.0%**, `f2d` 1.5% |
-| 12 | A citation's shape separates a fabricated cite from an unreachable real one | **FALSIFIED** | `.recon/probe-slugs.mjs` printed `discriminator FAILED`. `999 U.S. 1234` is structurally plausible (`us` reaches page 2722) and so is `678 F. Supp. 3d 443` (`f-supp-3d` reaches 1326). Both 404. **Do not build on it** |
+| 12 | A citation's shape separates a fabricated cite from an unreachable real one | **FALSIFIED** | `.recon/probe-slugs.mjs` printed `discriminator FAILED`. `999 U.S. 1234` is structurally plausible (`us` reaches page 2722) and so is `678 F. Supp. 3d 443` (`f-supp-3d` reaches 1326). Both 404. **Partly superseded by row 18** — a *volume-growth projection* separates them, but the shape check does not, and `coverage.ts` still claims nothing from shape |
 | 13 | Empty-opinion corpus records are rare edge cases | **FALSIFIED** | 41 of 48 sampled `us/572` records have an empty `opinions` array (orders lists). Captured as a flag, not an error, so Phase 4 cannot reach FABRICATED from it |
 | 14 | All four Phase 2 normalisation traps are real | **FALSIFIED** | Only **three** are. `“s finding` is the retracted finding — **0 occurrences of `“s`** in the raw bytes; the corpus reads "this finding is amply supported by modern authority", clean. Hyphenation is also absent (0 occurrences of `-\n`). See the Phase 2 correction |
 | 15 | A ground-truth quote can be located with `brief.indexOf(quote)` | **FALSIFIED** | Returns **-1 for all five** expectations: the fixture stores quotations whitespace-normalised while the brief wraps them across lines. Every Phase 0 test item was silently built with a zero-length span at offset 0, invisible only because `auditItem` was still `NotImplemented` |
+| 16 | CourtListener search can separate a fabricated cite from an unreachable real one | **FALSIFIED** | `.recon/probe-crosscheck.mjs`: the fabricated `999 U.S. 1234, 1240` returned **102** results, top hit *United States v. Bacon*, `900 F.3d 1234` — matched on the raw page token `1234`. `999 X.Z. 1234`, an unmapped reporter that cannot exist, returned **76**. Zero of the top five hits carried the queried citation in their own list, for E3 **and** E4. A non-zero count is evidence of nothing. The cross-check is now enrichment only and structurally cannot move a verdict |
+| 17 | A reporter's volume growth rate separates a fabricated cite from an unreachable real one | **CONFIRMED** | `.recon/probe-volume-rates.mjs`: `us` ran **2.54 vol/yr**, so volume 999 at asserted year 2021 is **1.697×** the projected ~589; E4 at 2023 is **1.064×**. Three real controls measure **1.007 / 1.151 / 1.098**, so bound **1.5** separates them. **Heuristic, not a proof** — one fabricated anchor against three controls, a linear rate on series that demonstrably accelerate (`f-supp-3d` 72.86/yr). Limits recorded as `docs/LIMITS.md` §8, with a wired falsification test |
+| 18 | A refusal and an accusation can share one "nothing found" return value | **FALSIFIED** | Four distinct situations collapsed into a nullable return — resolved / refused / implausible / ambiguous — and collapsing them is how a tool accuses real cases. `CascadeOutcome` is now a closed union, and `CorpusError.why` is machine-readable so the verdict layer branches on the type rather than parsing prose |
 
 **Retraction note (kept by convention).** Mid-recon I concluded from a snippet dump that CL search "returns 135 cases that don't contain the phrase." That inference was unsound — it read *phrase absent* off a snippet that merely doesn't display it, and opinions are long. §3.3's rigorous tests replaced it. The corrected finding is subtler and is what the product is built on.
 
@@ -330,6 +333,32 @@ Built on branch `phase-2-parser-normalisation`. Files: `lib/match/normalize.ts`,
 **Acceptance:** `"347 U.S. 483"` resolves to the 1954 SCOTUS case; **a case-name-only query is rejected by design** (regression test asserting we never resolve by name); an unresolvable citation returns `FABRICATED` with a populated attempt log; the log serialises to JSON.
 **Watch:** CL's top hit for the *name* is a 2015 district case. If any code path matches on name, the tool silently mis-attributes — the exact bug we sell against.
 
+### Phase 3 — complete, 2026-09-23 (receipts)
+
+Built on branch `phase-3-resolution-cascade`. Files: `lib/resolve/cascade.ts`, `lib/resolve/courtlistener.ts`, `tests/resolve.test.ts`; modified `lib/corpus/coverage.ts`, `lib/corpus/index.ts`, `lib/types.ts`. New evidence base: `.recon/probe-crosscheck.mjs`, `.recon/probe-volume-rates.mjs` → `fixtures/volume-rates.json`.
+
+| Acceptance criterion | Result | Evidence |
+|---|---|---|
+| `"347 U.S. 483"` resolves to the 1954 SCOTUS case | **PASS** | `Brown v. Board of Education`, `1954-05-17`, 26,823 chars, frozen offset **9564** reproduced. Resolved from the curated index with `networkCalls() === 0` |
+| A case-name-only query is rejected by design | **PASS** | Asserted four ways: a name-only citation refuses with `why: "no-citation"`; `looksLikeCitation("Brown v. Board of Education")` is false; `searchByCitation` returns `[]` **having issued zero requests** (the refusal precedes the fetch); and `CourtListenerClient.prototype.searchByName` is asserted `undefined` — there is no name path to call |
+| An unresolvable citation returns FABRICATED with a populated attempt log | **DEFERRED to Phase 4 by design** | The cascade supplies the *input* to that verdict: E3 returns `state: "implausible"` with a recorded ratio/bound, which is what licenses the accusation. The verdict itself is `auditItem`, still the Phase 4 stub |
+| The log serialises to JSON | **PASS** | Asserted for every ground-truth line and for the whole brief, via `JSON.parse(JSON.stringify(trace))` deep-equality |
+| Watch item: no code path matches on case name | **PASS** | Same evidence as row 2. The cascade has no name parameter anywhere |
+| Typecheck / suite | **PASS** | `tsc --noEmit` exit 0; resolve 28/28; full suite **132 passed / 13 failed / 1 todo**, all 13 failures still the single `auditItem is not implemented yet — Phase 4` stub |
+
+**The phase's real problem, and how it was solved.** The corpus layer returns the **same** typed failure for E3 (`999 U.S. 1234`, fabricated → must be `FABRICATED`) and E4 (`678 F. Supp. 3d 443`, real but post-coverage → must be `UNVERIFIABLE_COVERAGE`). §4 row 12 already recorded that no page/volume *shape* check separates them. Two probes were run against the question, and only the second one works:
+
+- `.recon/probe-crosscheck.mjs` — **CourtListener cannot separate them, and is affirmatively misleading.** Searching the fabricated `999 U.S. 1234, 1240` returned **102** results whose top hit was *United States v. Bacon*, `900 F.3d 1234` — matched on the raw page token `1234`. `999 X.Z. 1234`, an unmapped reporter that cannot exist, returned **76**. Zero of the top five hits carried the queried citation in their own list, for E3 **and** for E4. So the cross-check is enrichment only, and the cascade is structured so it cannot move an outcome. Recorded as §9 of `docs/LIMITS.md`.
+- `.recon/probe-volume-rates.mjs` — **volume growth projection does separate them.** `us` ran **2.54 vol/yr**, so by E3's asserted year 2021 it had plausibly reached ~589 volumes, making volume 999 **1.697×** the projection; E4 at 2023 is **1.064×**. Three real-citation controls measured **1.007 / 1.151 / 1.098**, so a bound of **1.5** separates them — placed deliberately *above* the geometric midpoint (1.398), because refusing a fabricated citation is a safe miss while accusing a real one is the worst outcome available.
+
+**Design consequence.** An outcome is a closed union — `resolved` / `refused` / `implausible` / `ambiguous` — not a nullable case, because four very different situations all look like "nothing found" and collapsing them is exactly how a tool ends up accusing real cases. Only `implausible` may reach `FABRICATED`, and it needs **no network at all**: it derives from two local measured fixtures. A test asserts E3 still comes back `implausible` under a total simulated outage, while every real citation in the brief is refused — the accusation rests on measured data, not on a request that could fail.
+
+**A wrong invariant I wrote and then corrected.** My first version of that test asserted *nothing* may be `implausible` during a network outage. It failed, and the test was wrong, not the code: `implausible` is network-independent by design, so asserting it away would have pinned a worse property. Rewritten to assert what actually matters — unreachable **real** cases are refused.
+
+**Watch item addressed:** the cross-check is OFF by default and asserted to issue **zero** requests unless explicitly enabled, because the anonymous budget is ~5/min and the probe proved it adds no evidential weight. A throttle records as `skipped`, never `miss`, so "we could not ask" cannot read as "the second source disagreed".
+
+---
+
 ### Phase 4 — Quote matcher & verdicts · Day 3
 **Goal:** four-valued verdicts with evidence.
 **Tasks:** normalised exact substring → fuzzy token alignment (≥0.92) · verdict logic · OCR-confidence gating so a degraded span yields `UNVERIFIABLE` rather than an accusation.
@@ -391,12 +420,14 @@ docs/                   LIMITS.md  DESIGN.md
 
 | Day | Phases | Exit condition |
 |---|---|---|
-| **0 (today)** | 0 | Public repo pushed; failing tests name the four verdicts; key verified |
-| 1 | 1 | Brown fetched + cached; coverage boundary recorded |
-| 2 | 2, 3 | Four trap tests green; cascade never resolves by name |
+| **0 (today)** | 0 | ✅ Public repo pushed; failing tests name the four verdicts; key verified |
+| 1 | 1 | ✅ Brown fetched + cached; coverage boundary recorded |
+| 2 | 2, 3 | ✅ Three trap tests green (the fourth was retracted, §4 row 14); cascade never resolves by name |
 | 3 | 4, 5 | All four verdicts reachable; misattribution recovers the true home |
 | 4 | 6, 7 | Belt self-verifies; UI screenshotted and contrast-measured |
 | 5 | 8 | Live URL + video + README + submitted |
+
+**Progress note (2026-09-23).** Phases 0–3 are complete and merged; `main` carries all three. Phase 2 took one additional branch-free correction (the retracted fourth trap) and Phase 3 took two probes to settle its central question, both recorded above. Remaining: Phases 4–8, and the two open items the plan deliberately leaves open — E6's verdict definition (`docs/LIMITS.md` §4) and the OCR floor's calibration (§6).
 
 **Fan-out:** orchestrator does Phase 0 and the shared interfaces first, then one subagent per disjoint file set (Phases 1–2 in parallel; 3–4 in parallel; 5–6 sequential because 6 depends on 4). Orchestrator re-verifies everything, then commits.
 
@@ -459,7 +490,7 @@ docs/                   LIMITS.md  DESIGN.md
 1. **"Isn't this a wrapper around CourtListener?"** No — CL is 401 on every endpoint carrying opinion text. The corpus is Harvard CAP primary source, keyless; CL is only a cross-check. §3.4.
 2. **"Isn't an LLM checking an LLM circular?"** That is the thesis. The verifier is deterministic string/graph logic over primary text; the LLM may only propose a span, which is then checked. We demo our own model being rejected.
 3. **"What if the corpus is wrong?"** A first-class outcome, not a bug: `UNVERIFIABLE` with `ocr_confidence` shown. Brown v. Board scores 0.664.
-4. **"Your coverage stops somewhere. What about a 2024 case?"** We detect the boundary and return `UNVERIFIABLE-COVERAGE`, never "fabricated." A verifier that accuses outside its competence is unsafe to ship.
+4. **"Your coverage stops somewhere. What about a 2024 case?"** We detect the boundary and return `UNVERIFIABLE-COVERAGE`, never "fabricated." A verifier that accuses outside its competence is unsafe to ship. The one thing that *can* be accused past the boundary is a citation whose volume could not have existed at the date it asserts — a measured volume-growth projection with a recorded bound, and the limits of that heuristic are documented rather than hidden (`docs/LIMITS.md` §8).
 5. **"How is this different from Clearbrief?"** It is enterprise, closed, and binary. We are keyless, open, three-valued, distinguish misattribution, and serve the legal-aid tier it does not.
 6. **"Are you giving legal advice?"** No — we report textual and citation facts with offsets. No advice, no view on the merits.
 7. **"Privileged documents on your server?"** A real limitation, stated plainly. Core is local-first; a `--local` mode has no egress except public case-law fetches, and the demo shows the audit log of exactly which bytes left the machine.
