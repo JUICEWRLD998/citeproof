@@ -203,6 +203,8 @@ Kept deliberately: a plan that still asserts a falsified assumption misleads who
 | 16 | CourtListener search can separate a fabricated cite from an unreachable real one | **FALSIFIED** | `.recon/probe-crosscheck.mjs`: the fabricated `999 U.S. 1234, 1240` returned **102** results, top hit *United States v. Bacon*, `900 F.3d 1234` — matched on the raw page token `1234`. `999 X.Z. 1234`, an unmapped reporter that cannot exist, returned **76**. Zero of the top five hits carried the queried citation in their own list, for E3 **and** E4. A non-zero count is evidence of nothing. The cross-check is now enrichment only and structurally cannot move a verdict |
 | 17 | A reporter's volume growth rate separates a fabricated cite from an unreachable real one | **CONFIRMED** | `.recon/probe-volume-rates.mjs`: `us` ran **2.54 vol/yr**, so volume 999 at asserted year 2021 is **1.697×** the projected ~589; E4 at 2023 is **1.064×**. Three real controls measure **1.007 / 1.151 / 1.098**, so bound **1.5** separates them. **Heuristic, not a proof** — one fabricated anchor against three controls, a linear rate on series that demonstrably accelerate (`f-supp-3d` 72.86/yr). Limits recorded as `docs/LIMITS.md` §8, with a wired falsification test |
 | 18 | A refusal and an accusation can share one "nothing found" return value | **FALSIFIED** | Four distinct situations collapsed into a nullable return — resolved / refused / implausible / ambiguous — and collapsing them is how a tool accuses real cases. `CascadeOutcome` is now a closed union, and `CorpusError.why` is machine-readable so the verdict layer branches on the type rather than parsing prose |
+| 19 | The mandated ≥0.92 fuzzy alignment works as specified | **FALSIFIED, then fixed** | Scored against a window longer than the quotation, padding counted as insertions: a 25-token passage with one word changed scored **0.36** and returned `null`, making the floor unreachable and the path dead code. `.recon/probe-fuzzy-threshold.mjs` also measured that **no ground-truth item exercises it at all** (true positives are exact `1.000`; nearest false candidate `0.447`). Fixed with fitting alignment; synthetic controls now exercise it. §10 |
+| 20 | An in-coverage citation matching no case is sufficient to accuse | **FALSIFIED** | A truncated or failed volume index is indistinguishable from "no such case" at the call site, and `cache.ts` warns the index is the layer to distrust first. Accusation now requires a substantive index (`indexSize >= MIN_INDEX_FOR_ACCUSATION = 3`); below it the result is `UNVERIFIABLE_UNRESOLVED`. §11 |
 
 **Retraction note (kept by convention).** Mid-recon I concluded from a snippet dump that CL search "returns 135 cases that don't contain the phrase." That inference was unsound — it read *phrase absent* off a snippet that merely doesn't display it, and opinions are long. §3.3's rigorous tests replaced it. The corrected finding is subtler and is what the product is built on.
 
@@ -366,6 +368,33 @@ Built on branch `phase-3-resolution-cascade`. Files: `lib/resolve/cascade.ts`, `
 **Acceptance:** all four verdict branches reachable from fixtures; a correct quote from a 0.66-OCR case is **never** `FABRICATED`; every verdict returns offsets + a reason string; unit-tested against the `"separate educational..."` case-sensitivity trap.
 **Watch:** the OCR gate must be a *threshold with a recorded number*, not a vibe. If it silently flips verdicts the honesty layer is theatre.
 
+### Phase 4 — complete, 2026-09-23 (receipts)
+
+Built on branch `phase-4-verdicts`. Files: `lib/verdict/verdicts.ts`, `lib/verdict/ocr.ts`, `lib/match/misattribution.ts`, `tests/verdicts.test.ts`; modified `lib/verdict/index.ts`, `lib/match/match.ts`, `lib/corpus/index.ts`, `lib/resolve/cascade.ts`, `lib/types.ts`, `lib/audit.ts`, `fixtures/ground-truth.json`, `tests/ground-truth.test.ts`. New evidence: `.recon/probe-fuzzy-threshold.mjs`.
+
+| Acceptance criterion | Result | Evidence |
+|---|---|---|
+| All four verdict branches reachable from fixtures | **PASS** | The real brief audits to **five** distinct verdicts: `VERIFIED` (347 U.S. 483, chars 9564–9619), `MISATTRIBUTED` (163 U.S. 537 → recovered to Brown at 9564–9619), `FABRICATED` (999 U.S. 1234), `UNVERIFIABLE_COVERAGE` (678 F. Supp. 3d 443), `UNVERIFIABLE_LOW_CONFIDENCE` (163 U.S. 537, OCR 0.434) |
+| A correct quote from a 0.66-OCR case is **never** `FABRICATED` | **PASS** | Brown's holding comes back `VERIFIED` at OCR 0.664, below the 0.5 floor — asserted both as a pure precedence test and end to end. The gate is one-directional, and the direction is asserted at the boundary from both sides |
+| Every verdict returns offsets + a reason string | **PASS** | Asserted for every item of the real brief: non-empty reason, and `foundInOpinion` present for every positive find. A `MISATTRIBUTED` result's offsets are checked to **contain the quotation in the true home's text**, not merely to be non-zero |
+| Unit-tested against the `"separate educational..."` case-sensitivity trap | **PASS** | Lowercase returns `-1` from `indexOf`, 1 from the matcher; the returned span is asserted equal to the original capitalised bytes and to the frozen offset **9564** |
+| OCR gate is a threshold with a **recorded number** | **PASS** | `OCR_CONFIDENCE_FLOOR = 0.5` pinned from both sides at ±0.0001, plus both measured anchors: Plessy `0.434` refuses, Brown `0.664` accuses. Recorded with its derivation in `lib/types.ts` and `docs/LIMITS.md` §6 |
+| Typecheck / suite | **PASS** | `tsc --noEmit` exit 0; verdicts 44/44; full suite **183 passed / 1 todo** — the 13 Phase 4 stub failures are gone |
+
+**Three findings worth the reader's time.**
+
+**1. The fuzzy matcher was dead code, and no fixture could have caught it.** §3.5 mandates a ≥0.92 token-alignment stage. Scored as a plain edit distance against a window deliberately *longer* than the quotation, every padding token counted as an insertion: a genuine 25-token passage with one word changed scored **0.36** and the matcher returned `null`. `.recon/probe-fuzzy-threshold.mjs` measures why this stayed invisible — both true-positive fixtures are verbatim (`1.000`, exact path) and the nearest false candidate is E3's paraphrase at `0.447`, so **no ground-truth item exercises the fuzzy path at all**. Synthetic positive controls found it; the fix is fitting (semi-global) alignment, making the window's unaligned ends free. Recorded as `docs/LIMITS.md` §10.
+
+**2. An empty volume index is not evidence of fabrication.** Phase 3's criterion that an unresolvable citation become `FABRICATED` was unmet, but refusing blindly is wrong in the other direction: a truncated or failed index is *indistinguishable* from "no such case" at the call site, and `lib/corpus/cache.ts` warns the index is the layer to distrust first. `CorpusError.Unresolved` now carries `indexSize`, and the split is made on evidence — a substantive index with no match accuses; an empty or near-empty one refuses. The threshold `MIN_INDEX_FOR_ACCUSATION = 3` is recorded in `lib/types.ts` with its derivation, chosen on the same asymmetry as the OCR floor. Recorded as §11.
+
+**3. Ground truth had to state its own coordinates.** `tests/ground-truth.test.ts` derived them by splitting `citationRaw` on spaces, which yields reporter `"F."` and page `0` for `678 F. Supp. 3d 443` — so E4 would have been refused as *unparseable* rather than as out-of-coverage, and the test would have passed while asserting nothing. E3 also carried no asserted year, without which the Phase 3 projection cannot fire and the fabricated citation resolves by a different mechanism than the one under test. The fixture now records explicit coordinates, with the reason recorded here rather than the change being silent.
+
+**A correction kept in place.** `.recon/probe-fuzzy-threshold.mjs` first used an Anderson holding written *from memory*, which scored `0.273` against the opinion — it was not in the corpus, and it silently zeroed the probe's true-positive column, making the sweep print `1/2` where it should have read `2/2`. That is this project's own failure mode committed inside its own evidence tooling. The control is now extracted from the raw fixture bytes, and the probe asserts its own extraction succeeded.
+
+**Watch item addressed:** both thresholds are recorded numbers with derivations, each pinned from both sides in tests, so a silent change to either fails the build rather than quietly flipping verdicts.
+
+---
+
 ### Phase 5 — Misattribution resolver · Day 3–4
 **Goal:** given a sentence absent from the cited case, find where it actually lives.
 **Tasks:** local-cache scan first, then a single budgeted CL search · rank candidates · render a side-by-side diff.
@@ -423,11 +452,11 @@ docs/                   LIMITS.md  DESIGN.md
 | **0 (today)** | 0 | ✅ Public repo pushed; failing tests name the four verdicts; key verified |
 | 1 | 1 | ✅ Brown fetched + cached; coverage boundary recorded |
 | 2 | 2, 3 | ✅ Three trap tests green (the fourth was retracted, §4 row 14); cascade never resolves by name |
-| 3 | 4, 5 | All four verdicts reachable; misattribution recovers the true home |
+| 3 | 4, 5 | ✅ All four verdict branches reachable; ⏳ misattribution recovers the true home (done for the local corpus; CL enrichment deferred to Phase 5) |
 | 4 | 6, 7 | Belt self-verifies; UI screenshotted and contrast-measured |
 | 5 | 8 | Live URL + video + README + submitted |
 
-**Progress note (2026-09-23).** Phases 0–3 are complete and merged; `main` carries all three. Phase 2 took one additional branch-free correction (the retracted fourth trap) and Phase 3 took two probes to settle its central question, both recorded above. Remaining: Phases 4–8, and the two open items the plan deliberately leaves open — E6's verdict definition (`docs/LIMITS.md` §4) and the OCR floor's calibration (§6).
+**Progress note (2026-09-23).** Phases 0–4 are complete and merged; `main` carries all four. The full suite is **183 passed / 1 todo** — every failing test from Phase 0 is now green, and the one `it.todo` is E6, which stays visible deliberately because its verdict definition (`docs/LIMITS.md` §4) is still an open question rather than an oversight. Remaining: Phases 5–8, plus the open items the plan intends to leave open — E6's definition (§4), the OCR floor's calibration (§6), the fuzzy floor's unmeasured false-positive rate (§10), and `MIN_INDEX_FOR_ACCUSATION` (§11).
 
 **Fan-out:** orchestrator does Phase 0 and the shared interfaces first, then one subagent per disjoint file set (Phases 1–2 in parallel; 3–4 in parallel; 5–6 sequential because 6 depends on 4). Orchestrator re-verifies everything, then commits.
 
