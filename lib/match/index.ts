@@ -10,6 +10,14 @@ export {
 export {
   scanForTrueHome,
   findTrueHome,
+  rankTrueHomes,
   type MisattributionHit,
   type MisattributionScanOptions,
+  type RankedTrueHomes,
 } from "./misattribution";
+export {
+  verifyTrueHomeCandidates,
+  type ClCandidateAttempt,
+  type ClCandidateOptions,
+  type ClCandidateSearch,
+} from "./cl-candidates";

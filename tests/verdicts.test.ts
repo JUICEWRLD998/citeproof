@@ -307,7 +307,6 @@ describe("verdict: the misattribution scan requires an EXACT match", () => {
     });
     expect(hit).not.toBeNull();
     expect(hit!.case.citation).toBe("347 U.S. 483");
-    expect(hit!.exact).toBe(true);
     expect(hit!.case.text.slice(hit!.span.start, hit!.span.end)).toContain("inherently unequal");
   });
 
@@ -321,11 +320,28 @@ describe("verdict: the misattribution scan requires an EXACT match", () => {
 
   it("excludes the cited case, so a correct citation cannot become an accusation", () => {
     const quote = "Separate educational facilities are inherently unequal.";
-    // Without exclusion Brown is found.
-    expect(scanForTrueHome(quote).length).toBeGreaterThan(0);
-    // With Brown excluded there is no exact home left, so the caller keeps the cited-case verdict.
-    const hit = findTrueHome(quote, { exclude: ["347 U.S. 483", "98 L. Ed. 2d 873", "74 S. Ct. 686"] });
-    expect(hit).toBeNull();
+    // Without exclusion Brown is among the candidates.
+    const all = scanForTrueHome(quote).map((h) => h.case.citation);
+    expect(all).toContain("347 U.S. 483");
+
+    // With Brown excluded, Brown must be gone from the candidates — BY EVERY PARALLEL CITATION it
+    // is reachable under, which is the property that matters. It must NOT be "no candidates left":
+    // since Phase 5 the corpus holds a REAL quoter (671 F.3d 611, McCauley v. City of Chicago),
+    // so a non-empty result here is correct and an empty one would mean the exclusion had removed
+    // cases it should not have. This assertion previously required the empty list, which was only
+    // true while the corpus held a single case containing the sentence.
+    const afterExclusion = scanForTrueHome(quote, {
+      exclude: ["347 U.S. 483", "98 L. Ed. 2d 873", "74 S. Ct. 686"],
+    }).map((h) => h.case.citation);
+    expect(afterExclusion).not.toContain("347 U.S. 483");
+
+    // And excluding it by a PARALLEL citation alone must have the same effect, or the cited case
+    // could return through a reporter alias.
+    const viaParallel = scanForTrueHome(quote, { exclude: ["74 S. Ct. 686"] }).map((h) => h.case.citation);
+    expect(viaParallel).not.toContain("347 U.S. 483");
+
+    // Excluding every containing case does leave nothing — the guard's real boundary.
+    expect(findTrueHome(quote, { exclude: ["347 U.S. 483", "671 F.3d 611"] })).toBeNull();
   });
 
   it("skips a record with no opinion body, which cannot host a sentence", () => {

@@ -147,6 +147,17 @@ export interface AuditResult {
   foundInDocument?: Span;
   /** Set only for MISATTRIBUTED: the case the sentence actually lives in. */
   trueHome?: ResolvedCase;
+  /**
+   * Every case in the local corpus containing the quotation verbatim, best-first, when the
+   * verdict is MISATTRIBUTED.
+   *
+   * Added in Phase 5, because ranking the candidates is the resolver's real job and the reader
+   * deserves to see the competition rather than a single assertion. Measured: CourtListener
+   * reports **123 cases** containing Brown's holding, so naming one home with no candidates beside
+   * it would hide the fact that a sentence has many homes and only one origin. `trueHome` is the
+   * first entry; the rest are the quoters that lost.
+   */
+  trueHomeCandidates?: ResolvedCase[];
   /** The case the document cited. */
   citedCase?: ResolvedCase;
   /** Only computed when verbose; the demo renders this. */
