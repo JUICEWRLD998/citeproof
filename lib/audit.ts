@@ -1,8 +1,8 @@
 import type { AuditItem, AuditResult } from "./types";
 import { bindQuotations, parseCitations, parseQuotations } from "./resolve";
-import { auditItem } from "./verdict";
+import { auditItem, type AuditItemOptions } from "./verdict";
 
-export interface AuditOptions {
+export interface AuditOptions extends AuditItemOptions {
   /** Include resolution traces. The demo turns this on; batch runs leave it off. */
   verbose?: boolean;
   /** Cap on items, so a pathological document cannot burn the corpus budget. */
@@ -23,5 +23,5 @@ export async function auditDocument(
   const quotations = parseQuotations(document);
   const items: AuditItem[] = bindQuotations(citations, quotations);
   const capped = opts.maxItems ? items.slice(0, opts.maxItems) : items;
-  return Promise.all(capped.map((item) => auditItem(item)));
+  return Promise.all(capped.map((item) => auditItem(item, opts)));
 }

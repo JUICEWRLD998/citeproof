@@ -40,6 +40,12 @@ export type CascadeOutcome =
       citation: Citation;
       reason: string;
       why: string;
+      /**
+       * How many records the searched volume index held, when one was searched. `null` means no
+       * index was consulted at all. Only `unresolved-in-coverage` with a NON-ZERO count is
+       * evidence that the citation names nothing real — see `CorpusError.Unresolved.indexSize`.
+       */
+      indexSize?: number;
       trace: ResolutionStep[];
     }
   | {
@@ -125,9 +131,18 @@ function fromFailure(citation: Citation, detail: CorpusError, trace: ResolutionS
       };
 
     case "Unresolved":
-      // Inside coverage, and no case carries the citation. NOT an accusation by itself: the
-      // verdict layer still consults opinionBodyMissing and the OCR floor before it accuses.
-      return { state: "refused", citation, reason: detail.message, why: "unresolved-in-coverage", trace };
+      // Inside coverage, and no case carries the citation. `indexSize` is carried through because
+      // a substantive index with no match IS evidence the citation names nothing real, while an
+      // EMPTY index is evidence about our fetch instead — the cache module warns it is the layer
+      // to distrust first. The verdict layer decides; this layer does not conflate them.
+      return {
+        state: "refused",
+        citation,
+        reason: detail.message,
+        why: "unresolved-in-coverage",
+        indexSize: detail.indexSize,
+        trace,
+      };
 
     case "Network":
       // A network fault is never evidence about the law. Refuse.

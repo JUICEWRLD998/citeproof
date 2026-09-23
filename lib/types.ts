@@ -170,7 +170,24 @@ export type CorpusError =
       /** Present only for `volume-implausible-for-year`; the receipt's numbers. */
       projection?: { ratio: number; bound: number; projectedVolume: number; atYear: number };
     }
-  | { kind: "Unresolved"; message: string }
+  | {
+      kind: "Unresolved";
+      message: string;
+      /**
+       * How many records the volume index we searched actually held.
+       *
+       * Added in Phase 4, and it is verdict-deciding rather than diagnostic. The precedence rule
+       * says an ABSENT quotation for an in-coverage citation is FABRICATED — a citation that names
+       * a volume we hold and matches no record in it is exactly the fabricated-citation case the
+       * product exists to catch. But `lib/corpus/cache.ts` warns that the volume index is the layer
+       * to distrust first, and an EMPTY index is the shape a truncated or failed fetch leaves
+       * behind. An empty index is evidence about our fetch, not about the law, so the two must be
+       * told apart: a substantive index with no match supports an accusation; an empty one does not.
+       *
+       * `0` here means "we obtained no usable index" and must never become an accusation.
+       */
+      indexSize: number;
+    }
   /**
    * Added in Phase 1 after a MEASURED finding, because collapsing it into "Unresolved" would
    * have been a correctness bug, not a simplification.
@@ -213,3 +230,21 @@ export const OCR_CONFIDENCE_FLOOR = 0.5;
  * Fuzzy token-alignment similarity required before a near-match counts as found.
  */
 export const FUZZY_MATCH_THRESHOLD = 0.92;
+
+/**
+ * How many records a volume index must hold before its LACK of a match counts as evidence that the
+ * citation names nothing real.
+ *
+ * Added in Phase 4. The precedence rule says an in-coverage citation with no matching case is
+ * FABRICATED, and that is the fabricated-citation case the product exists to catch. But a volume
+ * index is the one thing in this pipeline we fetch wholesale and cache, and `lib/corpus/cache.ts`
+ * warns it is the layer to distrust first: a truncated or failed fetch leaves an index that is
+ * empty or nearly so, which at the call site is indistinguishable from "no such case".
+ *
+ * So emptiness is only evidence above a floor. A real CAP volume index holds hundreds of records;
+ * an index holding one or two is far more likely to be a truncated fetch than a genuinely tiny
+ * volume, and the two errors are not symmetric — refusing a fabricated citation is a safe miss,
+ * accusing a real one is the worst outcome available. Hence 3, chosen on that asymmetry exactly as
+ * `OCR_CONFIDENCE_FLOOR` is, and NOT statistically derived. Both are known-open parameters.
+ */
+export const MIN_INDEX_FOR_ACCUSATION = 3;
