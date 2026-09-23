@@ -205,6 +205,10 @@ Kept deliberately: a plan that still asserts a falsified assumption misleads who
 | 18 | A refusal and an accusation can share one "nothing found" return value | **FALSIFIED** | Four distinct situations collapsed into a nullable return — resolved / refused / implausible / ambiguous — and collapsing them is how a tool accuses real cases. `CascadeOutcome` is now a closed union, and `CorpusError.why` is machine-readable so the verdict layer branches on the type rather than parsing prose |
 | 19 | The mandated ≥0.92 fuzzy alignment works as specified | **FALSIFIED, then fixed** | Scored against a window longer than the quotation, padding counted as insertions: a 25-token passage with one word changed scored **0.36** and returned `null`, making the floor unreachable and the path dead code. `.recon/probe-fuzzy-threshold.mjs` also measured that **no ground-truth item exercises it at all** (true positives are exact `1.000`; nearest false candidate `0.447`). Fixed with fitting alignment; synthetic controls now exercise it. §10 |
 | 20 | An in-coverage citation matching no case is sufficient to accuse | **FALSIFIED** | A truncated or failed volume index is indistinguishable from "no such case" at the call site, and `cache.ts` warns the index is the layer to distrust first. Accusation now requires a substantive index (`indexSize >= MIN_INDEX_FOR_ACCUSATION = 3`); below it the result is `UNVERIFIABLE_UNRESOLVED`. §11 |
+| 21 | "Find a case containing the quotation" identifies where it lives | **FALSIFIED** | CourtListener reports **123 cases** containing Brown's holding, and its top hits are the cases that QUOTE it — Brown was not among them. A sentence has many homes and one origin, so the resolver must RANK. `.recon/probe-misattribution.mjs`. §12 |
+| 22 | A quotation has one home, so ranking can be tested with the original corpus | **FALSIFIED** | The corpus held exactly ONE case containing the holding, so first-match and earliest-match were indistinguishable and ranking was untestable against reality. A real quoter (`671 F.3d 611`, McCauley v. City of Chicago, 7th Cir. 2011) was verified and added; the scan returns it FIRST, 57 years after the origin |
+| 23 | A CourtListener hit can be reported as a true home | **FALSIFIED** | CL carries no opinion text (401 on `/opinions/<id>/`), so a hit is a lead. It becomes a candidate only after its citation resolves through CAP and the quotation is found verbatim there. A test feeds it Anderson — a real case that does NOT contain the holding — and asserts it is discarded. §13 |
+| 24 | Exclusion by a case's canonical citation is sufficient | **FALSIFIED** | Citing Brown as `74 S. Ct. 686` (a parallel reporter) let Brown back into the candidate list, which would produce a `MISATTRIBUTED` naming the case already cited. Now matched against every citation a case carries |
 
 **Retraction note (kept by convention).** Mid-recon I concluded from a snippet dump that CL search "returns 135 cases that don't contain the phrase." That inference was unsound — it read *phrase absent* off a snippet that merely doesn't display it, and opinions are long. §3.3's rigorous tests replaced it. The corrected finding is subtler and is what the product is built on.
 
@@ -402,6 +406,41 @@ Built on branch `phase-4-verdicts`. Files: `lib/verdict/verdicts.ts`, `lib/verdi
 **Acceptance:** the fixture sentence planted in the wrong case is recovered to its true home with a deep link; a genuinely invented sentence returns no candidate and stays `FABRICATED`.
 **Watch:** this is the differentiator — protect this phase's time. A false "found it elsewhere" is worse than no feature; require an exact normalised match before claiming a new home.
 
+### Phase 5 — complete, 2026-09-23 (receipts)
+
+Built on branch `phase-5-misattribution`. Files: `lib/match/cl-candidates.ts`, `tests/misattribution.test.ts`, `fixtures/corpus/f3d-671-0611-01.json`; modified `lib/match/misattribution.ts`, `lib/match/index.ts`, `lib/verdict/index.ts`, `lib/resolve/cascade.ts`, `lib/types.ts`, `tests/verdicts.test.ts`. New evidence: `.recon/probe-misattribution.mjs`, `.recon/find-brow-quoter.mjs`, `.recon/add-quoter-fixture.mjs`.
+
+| Acceptance criterion | Result | Evidence |
+|---|---|---|
+| The fixture sentence is recovered to its true home with a deep link | **PASS** | E2 (`163 U.S. 537` + Brown's holding) returns `MISATTRIBUTED` with true home **347 U.S. 483**, offset **9564–9619**, asserted to slice the true home's text to exactly the holding |
+| A genuinely invented sentence returns no candidate and stays `FABRICATED` | **PASS, via the low-confidence gate** | E5 returns no candidate from any source and lands on `UNVERIFIABLE_LOW_CONFIDENCE` — the correct refusal for a Plessy-cited line at OCR 0.434. (The fixture is E5, not E3; E3's fabricated line is separately asserted to produce no home and reach `FABRICATED` by the projection path.) |
+| Local-cache scan first, then a single budgeted CL search | **PASS** | The local scan runs first and in this build resolves E2 completely; the CL stage is off unless enabled and, when on, issues **exactly one** query per item — asserted by counter |
+| Rank candidates | **PASS** | Ranks all exact candidates, earliest published first; newest fixture makes this testable against reality (see below) |
+| Render a side-by-side diff | **DEFERRED to Phase 7** | The engine supplies what the diff needs and `trueHomeCandidates` carries each candidate's **own text**; the rendering is UI work |
+| Typecheck / suite | **PASS** | `tsc --noEmit` exit 0; misattribution 33/33; full suite **217 passed / 1 todo**; duration down to 7.3s |
+
+**The phase's real finding: ranking is load-bearing, and the corpus had to grow to prove it.**
+
+`.recon/probe-misattribution.mjs` measured that CourtListener reports **123 cases** containing Brown's holding — and that its top hits are the cases that QUOTE it (`570 U.S. 297`, `51 F.3d 440`, `671 F.3d 611`), with Brown not among them. So "find a case containing the sentence" is trivial and wrong; the resolver's job is to find the case it **originated** in.
+
+Before this phase the local corpus held exactly **one** case containing that sentence, so "first match" and "earliest match" were indistinguishable and ranking could not be tested against reality at all. `.recon/find-brow-quoter.mjs` searched for a real quoter and `.recon/add-quoter-fixture.mjs` added **McCauley v. City of Chicago, 671 F.3d 611 (7th Cir. 2011)**, verified to contain the holding byte-for-byte. The corpus now holds two real cases containing it, **57 years apart** — and the scan returns the 2011 quoter *first*, so a test asserts that a first-match resolver would get it wrong while the ranker gets it right.
+
+That fixture is added by its own idempotent script rather than by extending `fetch-fixtures.mjs`, because the three original fixtures are frozen against `foundAtCharOffset: 9564` and regenerating them from the network would move an offset the whole UI deep-links to.
+
+**A deliberate limitation, not an oversight.** The rule is **earliest publication date wins**, and that is a *proxy for origin, not proof of it*. The decisive evidence would be the citation graph — a case listing the other's citation in its own `cites_to` is demonstrably quoting it — and the curated fixtures do not carry `cites_to`. So the resolver reports which candidate it believes is the origin and shows the others beside it; it does not claim to have established the direction of quotation. Recorded as `docs/LIMITS.md` §12.
+
+**Two bugs found, both by tests written to fail in the right direction.**
+
+1. **Exclusion ignored parallel citations.** `scanForTrueHome` compared the exclusion set only against a case's canonical citation, so a document citing Brown as `74 S. Ct. 686` would let Brown back in through a reporter alias and produce a `MISATTRIBUTED` verdict naming the very case it had already cited. Now matched against every citation the case carries, with tests asserting the canonical and parallel spellings behave identically.
+
+2. **Two CourtListener queries per audited item.** A test asserting "one search per call" failed with `1` where the test wanted `0` for a `VERIFIED` line — revealing that the cascade's enrichment and the new candidate-discovery stage were each issuing their own query: **two requests per item** against an anonymous budget of roughly 5/minute, which does not survive a brief with more than two lines. The cascade now returns its hits via `CascadeOutcome.crossCheckHits` and the verdict layer mines those. One search per item, reused.
+
+**And one piece of waste removed.** The true-home scan ran the fuzzy window search over every ~60KB opinion and then **discarded every fuzzy hit**, because the ranker requires exact — 524ms per call (measured with a scratch harness, since deleted), and the `exact` flag it populated was always `true` by the time any caller read it. Replaced with the exact substring matcher. The suite went from ~30s of cascading 5s timeouts to **7.3s**.
+
+**Watch item honoured:** every candidate source passes through the exact matcher, and `findTrueHome`/`rankTrueHomes` have no path that can name a fuzzy home. Tests feed the resolver a near-miss, a real-but-wrong case (Anderson, which does *not* contain the holding), an uncited CL hit, and an unreachable citation — and assert each yields no home.
+
+---
+
 ### Phase 6 — Proposition belt + self-verification · Day 4
 **Goal:** LLM proposes a supporting span; our matcher adjudicates it.
 **Tasks:** OpenRouter client (`lib/llm/openrouter.ts`) with `response_format: json_schema`, `temperature: 0`, **pinned `seed`** · prompt returns a span only · **span is verified by the Phase-4 matcher** · record seed + prompt version in the fixture · cost logging from the response usage block.
@@ -452,11 +491,11 @@ docs/                   LIMITS.md  DESIGN.md
 | **0 (today)** | 0 | ✅ Public repo pushed; failing tests name the four verdicts; key verified |
 | 1 | 1 | ✅ Brown fetched + cached; coverage boundary recorded |
 | 2 | 2, 3 | ✅ Three trap tests green (the fourth was retracted, §4 row 14); cascade never resolves by name |
-| 3 | 4, 5 | ✅ All four verdict branches reachable; ⏳ misattribution recovers the true home (done for the local corpus; CL enrichment deferred to Phase 5) |
+| 3 | 4, 5 | ✅ All four verdict branches reachable; ✅ misattribution ranked, verified, and recovered to the true home |
 | 4 | 6, 7 | Belt self-verifies; UI screenshotted and contrast-measured |
 | 5 | 8 | Live URL + video + README + submitted |
 
-**Progress note (2026-09-23).** Phases 0–4 are complete and merged; `main` carries all four. The full suite is **183 passed / 1 todo** — every failing test from Phase 0 is now green, and the one `it.todo` is E6, which stays visible deliberately because its verdict definition (`docs/LIMITS.md` §4) is still an open question rather than an oversight. Remaining: Phases 5–8, plus the open items the plan intends to leave open — E6's definition (§4), the OCR floor's calibration (§6), the fuzzy floor's unmeasured false-positive rate (§10), and `MIN_INDEX_FOR_ACCUSATION` (§11).
+**Progress note (2026-09-23).** Phases 0–5 are complete and merged; `main` carries all five. The full suite is **217 passed / 1 todo** at 7.3s, and the one `it.todo` is E6, which stays visible deliberately because its verdict definition (`docs/LIMITS.md` §4) is still an open question rather than an oversight. Remaining: Phases 6–8, plus the open parameters the plan intends to leave open — E6's definition (§4), the OCR floor's calibration (§6), the fuzzy floor's unmeasured false-positive rate (§10), `MIN_INDEX_FOR_ACCUSATION` (§11), and the date-proxy ranking rule, which is a proxy for origin rather than proof of it (§12).
 
 **Fan-out:** orchestrator does Phase 0 and the shared interfaces first, then one subagent per disjoint file set (Phases 1–2 in parallel; 3–4 in parallel; 5–6 sequential because 6 depends on 4). Orchestrator re-verifies everything, then commits.
 

@@ -292,4 +292,61 @@ and it is **not statistically derived**. Both thresholds are known-open paramete
 we read an index for it and could not trust the answer. The distinction is kept because the two
 reasons call for different fixes — one is a corpus boundary, the other is a fetch that failed.
 
+## 12. The true home is RANKED, not found — and the rule is a proxy, not a proof
+
+The misattribution resolver's job is to answer *"where does this sentence actually live?"* The
+naive answer — "the first case containing it" — is wrong, and it is wrong in a way that produces a
+confident false accusation:
+
+`.recon/probe-misattribution.mjs` measured that **123 cases** contain *"Separate educational
+facilities are inherently unequal."* Asked for that sentence, CourtListener's top hits were
+`570 U.S. 297`, `51 F.3d 440`, `671 F.3d 611` — **quoting cases**. Brown was not among them. The
+same probe earlier showed CL ranks the cases that quote a decision *above* the decision itself.
+
+**The rule:** among cases containing the quotation verbatim, the **earliest published** is named the
+origin. A sentence originates once and is quoted thereafter, so the earliest containing case is the
+best available proxy for where it came from. Undated candidates never outrank dated ones, and ties
+break on the citation string so a report is byte-stable.
+
+**What this is not.** It is a **proxy for origin, not proof of it**. The decisive evidence would be
+the citation graph — a case listing the other's citation in its own `cites_to` is demonstrably
+quoting it — and the curated fixtures do not carry `cites_to`. So the resolver reports which
+candidate it *believes* is the origin and shows the others beside it; it does not claim to have
+established the direction of quotation. A later case that originated a line independently would be
+ranked below an earlier case that merely used it.
+
+**Corpus-dependent.** The local scan sees only what is cached. The corpus holds two real cases
+containing the Brown holding (Brown itself, and McCauley v. City of Chicago, 671 F.3d 611 (7th Cir.
+2011), added for exactly this purpose) — against CL's 123. Ranking is therefore *correct in kind and
+incomplete in scope*: the earliest case in the corpus may not be the earliest case that exists, and
+a home we name can be beaten by one we never fetched.
+
+## 13. The CourtListener stage produces leads, and nothing becomes a home until CAP confirms it
+
+`fixtures/corpus/` holds no full text from CL (401 on `/opinions/<id>/`, §3.4), so a CL result is a
+**lead**, never a finding. The stage in `lib/match/cl-candidates.ts` enforces that: a hit becomes a
+candidate only after its citation is resolved through CAP and the quotation is found **verbatim** in
+the resolved opinion. Otherwise it is discarded, with the reason recorded:
+
+| what the hit was | outcome | why |
+|---|---|---|
+| citation resolves, quotation found | `verified` | the only path that produces a candidate |
+| citation resolves, quotation absent | `not-found-in-text` | **the decisive case** — a search result proved nothing |
+| citation the corpus cannot reach | `unresolvable` | a real but post-coverage cite is still unreachable |
+| hit carries no citation | `no-citation` | unaddressable: cannot be resolved to text at all |
+| citation is the cited case | `excluded` | naming it would be accusing on the case already cited |
+
+Measured, from the same probe: CL returned **zero** results for the invented E5 sentence and zero for
+the E3 paraphrase. Better than the stage deserves to rely on — and it does not rely on it, which is
+the point. A zero count is not treated as evidence of absence, and a non-zero count is not treated
+as evidence of anything.
+
+**Budget.** The anonymous CL tier allows roughly 5 requests/minute. The stage issues **one query per
+audited item**, and reuses the hits the resolution cascade already fetched rather than searching
+again — a test asserts this, because the first implementation issued two queries per item and one
+test caught it. Only the first few hits are resolved against CAP (`maxLookups`, default 3), and the
+stage is **off unless explicitly enabled**. A throttle records as `skipped`, never as `miss`: *"we
+could not ask"* can never read as *"the second source found nothing"*.
+
+
 
