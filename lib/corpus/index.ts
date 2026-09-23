@@ -14,7 +14,15 @@ import {
 } from "./cap";
 import { CorpusCache, defaultCachePaths, type CachePaths, type FixtureIndexEntry } from "./cache";
 import { citationReporterToSlug } from "./slugs";
-import { detectOutOfCoverage, loadCoverageTable, type CoverageTable } from "./coverage";
+import {
+  assessVolumePlausibility,
+  detectOutOfCoverage,
+  loadCoverageTable,
+  loadVolumeRates,
+  volumeProjectionBound,
+  type CoverageTable,
+  type VolumeRates,
+} from "./coverage";
 
 /**
  * Thrown by every corpus function instead of returning null. Callers must branch on
@@ -32,6 +40,8 @@ export class CorpusFailure extends Error {
 
 export interface CorpusOptions extends CapClientOptions {
   cachePaths?: CachePaths;
+  /** Injectable so a test can pin an unmeasured rate table and assert the REFUSE branch. */
+  volumeRates?: VolumeRates;
 }
 
 interface Coordinates {
@@ -82,11 +92,13 @@ export class Corpus {
   private readonly client: CapClient;
   private readonly cache: CorpusCache;
   private readonly coverage: CoverageTable;
+  private readonly volumeRates: VolumeRates;
 
   constructor(opts: CorpusOptions = {}) {
     this.client = new CapClient(opts);
     this.cache = new CorpusCache(opts.cachePaths ?? defaultCachePaths());
     this.coverage = loadCoverageTable();
+    this.volumeRates = opts.volumeRates ?? loadVolumeRates();
   }
 
   /**
@@ -153,12 +165,26 @@ export class Corpus {
    * tell them apart.
    */
   private coverageFailure(coords: Coordinates): CorpusFailure | null {
-    const out = detectOutOfCoverage(coords, this.coverage);
+    const out = detectOutOfCoverage(coords, this.coverage, this.volumeRates);
     if (!out) return null;
+    // `why` and the projection numbers travel with the error. The cascade branches on `why`
+    // rather than re-deriving it: only `volume-implausible-for-year` is a positive structural
+    // claim, and it carries the measured ratio and bound in `projection`.
+    const projection = assessVolumePlausibility(coords, this.volumeRates);
     return new CorpusFailure({
       kind: "OutOfCoverage",
       message: out.boundary,
       boundary: out.boundary,
+      why: out.why,
+      projection:
+        out.why === "volume-implausible-for-year" && projection
+          ? {
+              ratio: projection.ratio,
+              bound: volumeProjectionBound(),
+              projectedVolume: projection.projectedVolume,
+              atYear: projection.atYear,
+            }
+          : undefined,
     });
   }
 
@@ -342,4 +368,13 @@ export async function coverageBoundary(reporter: string, opts: CorpusOptions = {
 
 export { CorpusCache, defaultCachePaths } from "./cache";
 export { REPORTER_SLUGS, citationReporterToSlug } from "./slugs";
-export { loadCoverageTable, detectOutOfCoverage } from "./coverage";
+export {
+  loadCoverageTable,
+  detectOutOfCoverage,
+  assessVolumePlausibility,
+  loadVolumeRates,
+  volumeProjectionBound,
+  type VolumeProjection,
+  type VolumeRates,
+  type OutOfCoverageWhy,
+} from "./coverage";
