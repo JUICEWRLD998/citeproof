@@ -1,0 +1,39 @@
+{
+  "recordedAt": "2026-09-24",
+  "recordedBy": "RUN_LIVE_BELT=1 npx vitest run tests/belt-record.test.ts",
+  "promptVersion": "p1",
+  "seed": 20260922,
+  "temperature": 0,
+  "model": "google/gemini-2.5-flash",
+  "pinnedProvider": "Google",
+  "case": {
+    "citation": "347 U.S. 483",
+    "fixture": "fixtures/corpus/us-347-0483-01.json"
+  },
+  "proposition": "Racial segregation in public education is unconstitutional.",
+  "runs": 5,
+  "byteIdenticalRuns": 5,
+  "providersServed": [
+    "Google"
+  ],
+  "proposedSpan": "We conclude that in the field of public education the doctrine of “separate but equal” has no place.",
+  "proposedSpanChars": 100,
+  "verification": {
+    "status": "supported",
+    "start": 9463,
+    "end": 9563,
+    "selfReportedConfidence": 0.9
+  },
+  "totalCostUsd": 0.006905,
+  "generationIds": [
+    "gen-1790237208-ki8Z11hifH74glRSdiow",
+    "gen-1790237217-3i7vt8KlnDDnjZXAb0lA",
+    "gen-1790237218-vai0dLosFLj3U0GONn4t",
+    "gen-1790237219-drC3bNyFFAEEGBzJRtmp",
+    "gen-1790237220-zqLcLFdsxprajP27zaEu"
+  ],
+  "declineControl": {
+    "proposition": "The Seventh Amendment guarantees a jury trial in all civil actions.",
+    "status": "declined"
+  }
+}

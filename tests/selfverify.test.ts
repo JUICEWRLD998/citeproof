@@ -12,12 +12,14 @@ import {
   summarise,
   verifyAttempt,
   verifyProposal,
+  DEFAULT_MODEL,
   DEFAULT_SEED,
   PROMPT_VERSION,
 } from "../lib/llm";
 import type { PropositionAttempt } from "../lib/llm";
-import { findBestMatch } from "../lib/match";
+import { findBestMatch, findQuoteIn } from "../lib/match";
 import { MIN_VERBATIM_RUN_TOKENS } from "../lib/types";
+import { envWithDotenv, resolveKeyForBundleGrep } from "./helpers/env";
 
 /**
  * Phase 6 acceptance, from implementation.md:
@@ -524,6 +526,52 @@ describe("self-verify: the belt is advisory and cannot change a verdict", () => 
   });
 });
 
+describe("self-verify: the recorded live run still describes this build", () => {
+  /**
+   * `fixtures/belt-run.json` is written by `tests/belt-record.test.ts` from a live run
+   * (`RUN_LIVE_BELT=1`). These checks are offline and exist so the artifact cannot rot silently:
+   * a seed, prompt version or model that no longer matches the code, or a recorded span that the
+   * corpus fixture no longer contains at the recorded offsets, fails the build rather than being
+   * quoted in a README as current.
+   */
+  const recordPath = join(root, "fixtures/belt-run.json");
+  const record = JSON.parse(readFileSync(recordPath, "utf8"));
+
+  it("records the seed, temperature, prompt version and model the code actually uses", () => {
+    expect(record.seed).toBe(DEFAULT_SEED);
+    expect(record.temperature).toBe(0);
+    expect(record.promptVersion).toBe(PROMPT_VERSION);
+    expect(record.model).toBe(DEFAULT_MODEL);
+    expect(record.recordedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("records a span that is STILL verbatim in the corpus fixture, at the recorded offsets", () => {
+    const opinion = JSON.parse(readFileSync(join(root, record.case.fixture), "utf8")).text as string;
+    const found = findQuoteIn(opinion, record.proposedSpan);
+    expect(found, "the recorded span is no longer in the fixture it names").not.toBeNull();
+    expect(found).toEqual({ start: record.verification.start, end: record.verification.end });
+    expect(record.verification.status).toBe("supported");
+    // The offsets are the claim the UI deep-links to, so check the slice too rather than trusting
+    // the pair of numbers to have stayed in step with the bytes.
+    expect(opinion.slice(found!.start, found!.end)).toBe(record.proposedSpan);
+  });
+
+  it("does not claim a byte-stable replay it did not measure", () => {
+    expect(record.runs).toBeGreaterThan(1);
+    expect(record.byteIdenticalRuns).toBe(record.runs);
+    expect(record.providersServed.length).toBe(1);
+    expect(record.pinnedProvider).toBe(record.providersServed[0]);
+    expect(record.generationIds.filter(Boolean).length).toBe(record.runs);
+  });
+
+  it("records no support for the proposition the belt was measured against", () => {
+    // The belt's whole claim is that it is checked rather than trusted. The record has to show the
+    // check firing on something, or it is a record of a happy path only.
+    expect(["declined", "unsupported"]).toContain(record.declineControl.status);
+    expect(record.declineControl.proposition).not.toBe(record.proposition);
+  });
+});
+
 describe("self-verify: live determinism, opt-in", () => {
   /**
    * The acceptance criterion "identical seed ⇒ identical output across runs", against the real API.
@@ -539,8 +587,10 @@ describe("self-verify: live determinism, opt-in", () => {
   const live = process.env.RUN_LIVE_BELT === "1" ? it : it.skip;
 
   live("returns byte-identical output for identical requests", async () => {
-    const config = beltConfigFromEnv();
-    expect(config, "RUN_LIVE_BELT=1 but no OPENROUTER_API_KEY").not.toBeNull();
+    // vitest does not load `.env` and Next.js does, so the documented command would otherwise fail
+    // on a key the app would happily find. The env is assembled the same way the bundle grep does.
+    const config = beltConfigFromEnv(envWithDotenv());
+    expect(config, "RUN_LIVE_BELT=1 but no OPENROUTER_API_KEY in the environment or .env").not.toBeNull();
 
     const a = await proposeAndVerify(brown, "Racial segregation in public education is unconstitutional.", config);
     const b = await proposeAndVerify(brown, "Racial segregation in public education is unconstitutional.", config);
@@ -569,30 +619,6 @@ function collectFiles(dir: string): string[] {
     else out.push(full);
   }
   return out;
-}
-
-/**
- * Find the key the way Next.js would, for the bundle grep.
- *
- * vitest does not load `.env`, and Next.js does, so a test that only checked `process.env` would
- * silently skip the one check that proves the key stays server-side. `.env` is gitignored; this
- * reads it locally and never writes the value anywhere.
- */
-function resolveKeyForBundleGrep(): string | null {
-  if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY;
-  const envPath = join(root, ".env");
-  if (!existsSync(envPath)) return null;
-  for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq < 0) continue;
-    if (trimmed.slice(0, eq).trim() === "OPENROUTER_API_KEY") {
-      const value = trimmed.slice(eq + 1).trim();
-      return value || null;
-    }
-  }
-  return null;
 }
 
 /** A minimal attempt, for tests that only care about one field. */
