@@ -259,3 +259,36 @@ export const FUZZY_MATCH_THRESHOLD = 0.92;
  * `OCR_CONFIDENCE_FLOOR` is, and NOT statistically derived. Both are known-open parameters.
  */
 export const MIN_INDEX_FOR_ACCUSATION = 3;
+
+/**
+ * How many consecutive words a rejected belt proposal must share with the opinion before the
+ * rejection is described as "the model drew on a real passage" rather than "the model invented text".
+ *
+ * Added in Phase 6, and it replaces a diagnostic that measurement showed to be worthless. The first
+ * version compared the proposal's best alignment SIMILARITY against the opinion, and
+ * `.recon/probe-belt-diagnostics.mjs` measured that it separates nothing: a real sentence the model
+ * EXTENDED with extra words scored **0.400** — exactly the same as a fully invented sentence — while
+ * nothing realistic reached the 0.92 floor at all, leaving the "paraphrased" branch as dead code.
+ *
+ * The longest contiguous verbatim run does separate them, because it measures reproduction rather
+ * than resemblance. Measured, on the same probe:
+ *
+ *   real holding quoted exactly     6/6 words  → 1.000
+ *   real quote + model's own intro  12/17      → 0.706
+ *   real quote + trailing comment    5/15      → 0.333
+ *   reworded real sentence           2/8       → 0.250
+ *   invented sentence                2/10      → 0.200
+ *   invented (damages)               2/12      → 0.167
+ *   a different opinion's sentence   2/12      → 0.167
+ *
+ * Real reproduction therefore starts at 5 words and incidental overlap stops at 2, so **4** sits in
+ * the empty gap with a word of margin on the incidental side. Short of 4 shared words, the honest
+ * description is that the text appears nowhere in the opinion.
+ *
+ * There is one ambiguous case and it is stated rather than hidden: a model that quotes a genuine
+ * short phrase — *"no genuine issue of material fact"*, 6 words — and builds a false sentence around
+ * it shares 6 words with a DIFFERENT opinion's text and 2 with this one, so it is correctly called
+ * invention here. The boundary is genuinely murky, which is exactly why this number decides only how
+ * a rejection is DESCRIBED and never whether a span is accepted.
+ */
+export const MIN_VERBATIM_RUN_TOKENS = 4;

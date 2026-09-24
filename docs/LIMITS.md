@@ -1,8 +1,9 @@
 # Limits
 
-What CiteProof cannot do, measured rather than assumed. Every number on this page came from a
-probe in `.recon/` that you can re-run. Where a claim was later found wrong, the correction is
-recorded in place rather than deleted.
+What CiteProof cannot do, measured rather than assumed. Every number on this page came from a probe in
+`.recon/` — or, for the belt, from the recorded live run in `fixtures/belt-run.json` — each of which
+you can re-run. Where a claim was later found wrong, the correction is recorded in place rather than
+deleted.
 
 Authored by **Mustapha Fadhlullah — independent security researcher**.
 
@@ -348,5 +349,77 @@ test caught it. Only the first few hits are resolved against CAP (`maxLookups`, 
 stage is **off unless explicitly enabled**. A throttle records as `skipped`, never as `miss`: *"we
 could not ask"* can never read as *"the second source found nothing"*.
 
+## 14. The belt proposes; it is not an authority, and it is not measured for accuracy
 
+The proposition belt asks a language model which sentence in an opinion supports a proposition. It is
+the one component whose input is not primary law, so it is the one component the rest of the system is
+built to disbelieve.
 
+**The single rule.** The model may only **propose a span**. That span goes through `findQuoteIn` —
+the same exact normalised matcher that checks the user's own quotations — and anything not found
+**verbatim** is `unsupported`. `lib/verdict` does not import `lib/llm` at all, asserted by test, so no
+proposal can move a verdict. A fabricated span at self-reported confidence `1.0` is rejected exactly
+as one at `0.0`; a real span at `0.01` still passes. The model's confidence is carried in the log and
+used for nothing else.
+
+**What "determinism" was measured to mean, and what it does not.**
+
+| claim | measured | status |
+|---|---|---|
+| `temperature: 0` + `seed` ⇒ identical output | **5/5 byte-identical** live requests, 2026-09-23 and again 2026-09-24 (`fixtures/belt-run.json`) | holds under pinning |
+| …on *any* provider | **not established.** All runs were served by **Google** | the seed is a per-provider parameter, so the client pins `order: ["Google"], allow_fallbacks: false` by default rather than trusting routing |
+| the request body itself is stable | asserted: fixed key order, no timestamp, byte-identical for identical inputs | what makes the seed reproducible at all |
+
+So "the demo replays identically" is a claim about **this pinned configuration**, not about the API.
+A run routed to a different provider is not comparable with these, and `fixtures/belt-run.json` names
+the provider that served it for exactly that reason.
+
+**Cost is logged, never estimated.** `usage.cost` is reported per response and **varies between
+identical calls** — measured $0.000505 to $0.001884 for the same request, because prompt caching moves
+the input cost. A response without a cost records `null`, not a guess: a fabricated number in a demo
+budget is a lie about money. Measured cost of the whole Phase 6 record (5 identical runs plus the
+decline control) was **$0.006905**, ≈$0.00115 per call on a 26.8k-character opinion — about an order
+of magnitude below §3.3's estimated $0.013/citation, which was computed from the price list without
+caching.
+
+**The no-key path is the floor, and it is the deployed default.** With no `OPENROUTER_API_KEY` nothing
+is proposed, **no request is issued at all**, and the belt reports `unavailable` — asserted by a
+counter, not by absence of a crash. Phases 1–5 then audit exactly as they do with a key. Three
+distinct facts are kept distinct, because collapsing them is how a demo ends up lying:
+
+- `unavailable` — the belt never ran (no key, or the request failed).
+- `declined` — the model returned an empty span. **Not evidence the proposition is unsupported.**
+- `unsupported` — a span was proposed and the matcher could not find it.
+
+**A rejection is described, not scored.** When a span is not found, the belt reports the **longest
+run of consecutive words** it shares verbatim with the opinion. `.recon/probe-belt-diagnostics.mjs`
+measured that a similarity score separates nothing — a real sentence the model *extended* scored
+**0.400**, identical to a fully invented one — while the contiguous run does: real reproduction
+starts at 5–12 words, incidental overlap stops at 2. `MIN_VERBATIM_RUN_TOKENS = 4` sits in that gap
+and decides **only how a rejection is worded, never whether a span is accepted**.
+
+**The key never leaves the server, checked by build rather than by assertion.** `tests/selfverify.test.ts`
+greps the built client bundle in `.next/static` for the key, for the string `OPENROUTER_API_KEY`, and
+for the prompt's own text; it also fails if any client component imports `lib/llm`. Two things make
+that check worth having: it **resolves the key the way Next.js does** (from the environment, falling
+back to the gitignored `.env`, which vitest does not load) so it cannot pass by finding no key to
+search for, and it was proven able to fail — a planted `openrouter.ai/api/v1` literal in a client
+component was caught, naming the exact chunk, and a client component importing `lib/llm` fails
+`next build` outright.
+
+**Not measured, and therefore not claimed:**
+
+- **No accuracy figure exists for the belt.** How often the model proposes the *right* span, over many
+  propositions, has not been measured — only that whatever it proposes is checked. A 100% rejection
+  rate for a broken prompt and a 100% acceptance rate for a good one are both consistent with every
+  test here.
+- **The model's behaviour is not pinned.** The seed and prompt version are pinned; the weights behind
+  the provider are not. `fixtures/belt-run.json` is a record of one model at one moment, with its
+  generation ids, not a guarantee about the next call. A silent provider-side model update would show
+  up as a changed span, and the only reason we would notice is that the record exists.
+- **The decline control is one proposition, once.** That the model declined the Seventh Amendment
+  proposition against Brown says nothing about its behaviour on a proposition that is *plausibly*
+  relevant — which is the harder case and the one the exact matcher cannot help with, because a real
+  sentence that supports nothing is real text.
+- **`selfReportedConfidence` is unexplained.** It is recorded because it is free; nothing in this
+  repo has established that it correlates with anything.

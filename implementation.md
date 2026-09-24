@@ -448,6 +448,38 @@ That fixture is added by its own idempotent script rather than by extending `fet
 **Acceptance:** a stubbed model response citing a span that is **not** in the opinion is caught and reported as an unsupported span; a real span passes; identical seed ⇒ identical output across runs; the key is read server-side only and never reaches the client bundle (assert by grepping the built client output for the key).
 **Watch:** the belt must have a **no-key path** — if `OPENROUTER_API_KEY` is absent the app degrades to Phases 1–5 and still audits. Never let the demo depend on the belt being up.
 
+### Phase 6 — complete, 2026-09-24 (receipts)
+
+Built on branch `phase-6-belt`. Files: `lib/llm/openrouter.ts`, `lib/llm/proposition.ts`, `lib/llm/selfverify.ts`, `lib/llm/index.ts`, `tests/selfverify.test.ts`, `tests/belt-record.test.ts`, `tests/helpers/env.ts`, `vitest.config.ts`. Evidence: `.recon/probe-seed-determinism.mjs`, `.recon/probe-provider-stability.mjs`, `.recon/probe-belt-diagnostics.mjs`, and the recorded live run `fixtures/belt-run.json`.
+
+| Acceptance criterion | Result | Evidence |
+|---|---|---|
+| A stubbed model response citing a span **not** in the opinion is caught, and reported as an unsupported span | **PASS** | End to end through the client with a stubbed 200: the fabricated span comes back `unsupported`, never `supported`. A span from a *different* opinion is caught too, so cross-case leakage cannot pass as support |
+| A real span passes | **PASS** | The holding proposed with different whitespace and typographic quotes is located and the **opinion's own bytes** are returned, not the model's rendering; the frozen ground-truth offset `9564` is reproduced from a proposal |
+| Identical seed ⇒ identical output across runs | **PASS** | **5/5 byte-identical** live requests on 2026-09-23 and again **5/5 on 2026-09-24**, all served by the pinned provider (`fixtures/belt-run.json`, generation ids recorded); the opt-in live test confirms it a third time. The pinning is part of the claim — see below |
+| The key is read server-side only and never reaches the client bundle | **PASS** | The bundle grep runs for real against a fresh `next build` and is **proven able to fail**: planting the actual key into a client chunk made it fail naming `.next/static/chunks/0bma92pht_c97.js`, and the clean rebuild passes with no skip warning; a planted `openrouter.ai/api/v1` literal was likewise caught naming the chunk, and a client component importing `lib/llm` fails the build outright |
+| Watch item: the no-key path degrades and still audits | **PASS** | With no key, `unavailable`, **zero requests issued** — asserted by a counter, not by absence of a crash. `unavailable` and `declined` are separate statuses, because *"we never asked"* must never read as *"the model found nothing"* |
+| Typecheck / suite / build | **PASS** | `tsc --noEmit` exit 0; `next build` exit 0 (Turbopack, 23.9s); suite **252 passed / 2 skipped / 1 todo** in 7.9s. Both skips are the deliberate `RUN_LIVE_BELT` opt-in cases; the todo is still E6 |
+| Task: record seed + prompt version in the fixture | **PASS** | `fixtures/belt-run.json` — written only after every claim about the run asserts: seed, temperature, prompt version, model, provider, the proposed span, its verified offsets, generation ids, cost, and the decline control. `tests/selfverify.test.ts` re-matches the recorded span against the corpus fixture and checks the constants, so the artifact fails the build when it rots |
+
+**The phase's real finding: the determinism claim was a routing coincidence until it was pinned.** The plan asserts `seed` + `temperature: 0` makes the belt "reproducible on camera", and the first probe agreed — 5/5 byte-identical. It also showed all five were served by **Google**, which is the confound: `seed` is a per-provider parameter and OpenRouter load-balances across providers, so those runs proved the seed works *there*, not that a request routed elsewhere would agree. `.recon/probe-provider-stability.mjs` then confirmed the provider can be pinned (`order` + `allow_fallbacks: false`), so the client **pins by default**. "The demo replays identically" is therefore a claim about a pinned configuration, not about the API — and the recorded fixture names the provider for exactly that reason.
+
+**Cost is a reported number, and it moves.** `usage.cost` varies between *identical* calls — measured **$0.000505 to $0.001884** — because prompt caching changes the input cost. So cost is logged from the response and never computed from a price table, and a response without a cost records `null` rather than a guess. The whole Phase 6 record (5 identical runs + the decline control) cost **$0.006905**, ≈$0.00115 per call on a 26.8k-character opinion: roughly an order of magnitude under §3.3's $0.013/citation estimate, which was derived from the price list without caching.
+
+**The diagnostic that didn't work.** When a proposal is rejected, the belt says *how* it was wrong, because "the model paraphrased a real sentence" and "the model produced text that appears nowhere" are different problems with different fixes. The first implementation compared similarity against the opinion, and `.recon/probe-belt-diagnostics.mjs` measured that it separates nothing: a real sentence the model **extended** scored 0.400 — the same as a **fully invented** one — and nothing realistic reached the 0.92 floor at all, leaving the paraphrase branch as dead code. The **longest contiguous verbatim run** does separate them (real reproduction 5–12 words, incidental overlap 0–2), so `MIN_VERBATIM_RUN_TOKENS = 4` sits in the empty gap. It decides only how a rejection is *worded*, never whether a span is accepted — and the one genuinely murky case is named in the constant rather than hidden. Recorded as §14 of `docs/LIMITS.md`.
+
+**Three bugs, and two were found by tests written to fail in the right direction.**
+
+1. **The key leaked into the result.** HTTP error bodies and unparseable-content bodies were echoed into the attempt's `detail` — and `detail` travels into the audit result served to the client. A gateway, a proxy error page or a debug endpoint can echo request headers, so nothing may assume a response *won't* contain the key. `scrubKey` now removes the key, a Bearer-prefixed echo, and a truncated tail from every byte of response text before it is used in a message; a canary test asserts a 500 echoing the key produces no result containing it.
+2. **The rejection diagnostic was dead code** — the previous section.
+3. **A from-memory control, again.** A test asserted an Anderson sentence written from recollection; it is not in the Anderson opinion. That is Phase 4's probe trap repeated inside Phase 6's test suite. The control is now extracted from the fixture bytes, with an assertion that the extraction succeeded and that the sentence is genuinely absent from Brown — otherwise it would prove nothing.
+
+**A security check that could pass without running, found while finishing the phase.** The bundle grep resolved the key from `process.env` only — but vitest does not load `.env` and Next.js does, so on the developer machine the check found no key, warned, and reported green. That is the same family as bug 1: a containment claim with no containment behind it. The test now assembles the environment the way Next.js does (`tests/helpers/env.ts`), so a build with a key configured **must** actually grep, and the only quiet path left is a build with no key at all — reported as vacuous rather than as passed.
+
+**One flake, diagnosed rather than retried.** A suite run produced four spurious `Test timed out in 5000ms` failures in the misattribution scans and the next run produced none: the dev machine is a 4GB laptop that had ~200MB free, so the true-home scan over every cached ~60KB opinion exceeded 5s while ten workers shared it. `testTimeout` is now 30s in `vitest.config.ts` with that measurement as the stated reason — a hang detector, not a performance target, since the suite completes in ~8s.
+
+**Watch item honoured:** the belt is structurally advisory. `lib/verdict` does not import `lib/llm` at all — asserted, not assumed — so no proposal can move a verdict, and an audit with no key is identical to an audit with one except for the belt's own section.
+
 ### Phase 7 — UI · Day 4
 **Goal:** the §5 design system, browser-verified.
 **Tasks:** tokens + DM Sans Variable + DM Mono · the margin-rail report view · verdict glyphs as inline SVG · empty/loading/error states written as a person would · the strike-through animation · `docs/DESIGN.md` with measured contrast ratios.
@@ -475,8 +507,9 @@ lib/resolve/            parse.ts cascade.ts courtlistener.ts
 lib/match/              normalize.ts match.ts misattribution.ts
 lib/verdict/            verdicts.ts ocr.ts
 lib/llm/                openrouter.ts proposition.ts selfverify.ts
-fixtures/               briefs + ground-truth.json  (tests read only these)
+fixtures/               briefs + ground-truth.json + belt-run.json  (tests read only these)
 tests/                  vitest — normalisation traps + all verdict branches
+tests/helpers/          shared test utilities (env loading for the bundle grep)
 .recon/                 probe-*.mjs (evidence base, cited in README) + driver.mjs
 docs/                   LIMITS.md  DESIGN.md
 .cache/                 sha256-keyed opinions (gitignored)
@@ -492,10 +525,16 @@ docs/                   LIMITS.md  DESIGN.md
 | 1 | 1 | ✅ Brown fetched + cached; coverage boundary recorded |
 | 2 | 2, 3 | ✅ Three trap tests green (the fourth was retracted, §4 row 14); cascade never resolves by name |
 | 3 | 4, 5 | ✅ All four verdict branches reachable; ✅ misattribution ranked, verified, and recovered to the true home |
-| 4 | 6, 7 | Belt self-verifies; UI screenshotted and contrast-measured |
+| 4 | 6, 7 | ✅ Belt self-verifies (determinism pinned, key contained, no-key path asserted); UI screenshotted and contrast-measured |
 | 5 | 8 | Live URL + video + README + submitted |
 
 **Progress note (2026-09-23).** Phases 0–5 are complete and merged; `main` carries all five. The full suite is **217 passed / 1 todo** at 7.3s, and the one `it.todo` is E6, which stays visible deliberately because its verdict definition (`docs/LIMITS.md` §4) is still an open question rather than an oversight. Remaining: Phases 6–8, plus the open parameters the plan intends to leave open — E6's definition (§4), the OCR floor's calibration (§6), the fuzzy floor's unmeasured false-positive rate (§10), `MIN_INDEX_FOR_ACCUSATION` (§11), and the date-proxy ranking rule, which is a proxy for origin rather than proof of it (§12).
+
+**Progress note (2026-09-24).** **Phases 0–6 are complete and merged; `main` carries all six.** The suite is **252 passed / 2 skipped / 1 todo** in 7.9s, `tsc --noEmit` and `next build` both exit 0. The two skips are the deliberate `RUN_LIVE_BELT` opt-in cases (`tests/selfverify.test.ts` for live determinism, `tests/belt-record.test.ts` for the fixture recorder) — run both before the demo, since each needs the real API to mean anything. Phase 6's acceptance is met against a **fresh build**, because the bundle grep is only worth what the build it reads is worth. The one `it.todo` is still E6.
+
+Phase 6 changed two things about the plan itself, and both are corrections rather than additions: the determinism claim holds only **under provider pinning** (§3.3 assumed the seed alone was enough), and the belt's measured cost is ≈**$0.00115/call** against §3.3's $0.013/citation estimate, because prompt caching moves the input cost and the estimate came from the price list. Both are recorded in `docs/LIMITS.md` §14 rather than smoothed over.
+
+Remaining: Phases 7–8, plus the open parameters the plan intends to leave open — E6's definition (§4), the OCR floor's calibration (§6), the fuzzy floor's unmeasured false-positive rate (§10), `MIN_INDEX_FOR_ACCUSATION` (§11), the date-proxy ranking rule (§12), and the belt's unmeasured accuracy (§14).
 
 **Fan-out:** orchestrator does Phase 0 and the shared interfaces first, then one subagent per disjoint file set (Phases 1–2 in parallel; 3–4 in parallel; 5–6 sequential because 6 depends on 4). Orchestrator re-verifies everything, then commits.
 
