@@ -1,0 +1,84 @@
+.masthead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px 32px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.identity {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.wordmark {
+  font-size: 21px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.wordmark:hover {
+  color: var(--accent-ink);
+}
+
+.tagline {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.facts {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/*
+ * A fact, not a badge. Mono micro-label + mono value, no pill, no border, no background: a bordered
+ * chip would make two pieces of context look like two pieces of interface, and the design's whole
+ * argument is that context is not decoration.
+ */
+.fact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.factLabel {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.factValue {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: var(--weight-mono);
+  color: var(--muted);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .masthead {
+    align-items: flex-start;
+  }
+
+  .facts {
+    gap: 12px 18px;
+  }
+}

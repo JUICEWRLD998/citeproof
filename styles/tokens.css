@@ -88,16 +88,36 @@
   /* ---- motion ---- */
   --t-colour: 0.15s ease;
   --t-move: 0.2s cubic-bezier(0.2, 0, 0.2, 1);
+  /*
+   * The strike-through on a FABRICATED line — the page's only animation, and it exists to be seen
+   * once. 180ms: slow enough to read as a deliberate pen stroke, fast enough that a reader watching
+   * a demo does not wait for it. Nothing else on the page animates, on purpose.
+   */
+  --t-strike: 0.18s;
+
+  /* ---- layout ---- */
+  /*
+   * The margin rail's width. 168px, measured rather than picked: the longest real citation in the
+   * ground truth is `678 F. Supp. 3d 443` (18 characters), which needs ~119px of content width at
+   * 11px DM Mono, and the rail also holds a mark plus a verdict word (`misattributed`, 12
+   * characters at 9.5px mono ≈ 82px) beside it. The earlier 132px column left the citation only
+   * 100px and it wrapped to three lines, which broke the rail rhythm that carries the whole layout.
+   */
+  --rail-w: 168px;
+  --rail-gap: 22px;
 
   /* ---- shadows: warm-tinted only; a neutral black shadow on warm paper reads as dirt ---- */
   --shadow-key: 0 2px 0 rgba(216, 66, 32, 0.11);
   --shadow-lift: 0 5px 12px rgba(238, 88, 32, 0.16);
+  /* Contact + ambient, the pairing that makes a surface sit ON the page rather than float over it. */
+  --shadow-sheet: 0 1px 0 rgba(48, 49, 39, 0.02), 0 18px 44px rgba(36, 38, 19, 0.05);
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
     --t-colour: 0s;
     --t-move: 0s;
+    --t-strike: 0s;
   }
 }
 

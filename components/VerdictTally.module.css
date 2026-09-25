@@ -1,0 +1,69 @@
+/*
+ * The tally: a measured strip, not a dashboard.
+ *
+ * It reads as a first line of the document rather than as a KPI panel: hairline separators, no card,
+ * no tint, no rounded boxes. Zero counts stay in place at lower contrast so the reader can see what
+ * did NOT happen.
+ */
+
+.tally {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 0;
+  margin: 0;
+}
+
+.cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 0 16px;
+  border-left: 1px solid var(--line);
+}
+
+.cell:first-child {
+  padding-left: 0;
+  border-left: none;
+}
+
+.mark {
+  transform: translateY(2px);
+}
+
+.count {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: var(--weight-mono);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* A verdict that did not occur is present, but does not compete for attention. */
+.empty {
+  opacity: 0.55;
+}
+
+.empty .count {
+  color: var(--faint);
+}
+
+@media (max-width: 640px) {
+  .cell {
+    padding: 0 12px;
+  }
+
+  .count {
+    font-size: 15px;
+  }
+}

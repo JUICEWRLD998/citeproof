@@ -1,0 +1,138 @@
+/*
+ * The annotated brief.
+ *
+ * Structure: one grid row per paragraph of the source document, two columns — the margin rail and
+ * the text. The rail's right border runs the full height of every row, so the margin rule is
+ * continuous down the whole document without a single absolutely-positioned line. That is why the
+ * row is a grid and not a float.
+ */
+
+.sheet {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-sheet);
+  padding: 34px 34px 30px 0;
+  margin: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: var(--rail-w) 1fr;
+  align-items: start;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 16px 0 18px;
+  border-right: 1px solid var(--line);
+  min-height: 100%;
+}
+
+.entry {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.entryCite {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--weight-mono);
+  color: var(--muted);
+  line-height: 1.35;
+  /*
+   * A long citation wraps rather than overflowing the rail, and is NEVER truncated: a truncated
+   * citation is a citation the reader cannot check.
+   */
+  overflow-wrap: anywhere;
+}
+
+.entryMark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.entryLabel {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.entry:hover .entryCite {
+  color: var(--accent-ink);
+}
+
+.paragraph {
+  margin: 0 0 18px;
+  padding-left: var(--rail-gap);
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--ink);
+}
+
+.paragraph:last-child {
+  margin-bottom: 0;
+}
+
+/*
+ * A citation is a formal notation, so it is set in mono IN THE TEXT — this is the one place the
+ * design's "mono for notation" rule and the document's own typography agree. It is not tinted: the
+ * rail already carries the verdict, and tinting the citation too would make the document itself
+ * look annotated by a highlighter rather than by a reader.
+ */
+.citeMark {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  font-weight: var(--weight-mono);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.quoteMark {
+  cursor: help;
+}
+
+@media (max-width: 860px) {
+  /*
+   * Below 860px the rail moves ABOVE its paragraph rather than squeezing the text. A 168px margin
+   * on a 375px screen would leave ~180px of text — narrower than the brief's longest word — so the
+   * margin becomes a header line and the document keeps its measure.
+   */
+  .sheet {
+    padding: 22px 20px 20px;
+  }
+
+  .row {
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    padding: 0 0 8px;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 10px;
+  }
+
+  .paragraph {
+    padding-left: 0;
+  }
+
+  .entry {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 9px;
+  }
+}
