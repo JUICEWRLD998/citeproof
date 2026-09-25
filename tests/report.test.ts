@@ -229,6 +229,31 @@ describe("report: the document title is the document's own", () => {
     );
   });
 
+  it("takes the title out of a CAPTION line, not the docket's shape", () => {
+    // The real fixture brief's shape: parties left, a column of `)`, the title right. Returning the
+    // whole line titled the page and the browser tab `v. ) DEFENDANT'S MOTION TO DISMISS`.
+    const caption = [
+      "IN THE UNITED STATES DISTRICT COURT",
+      "FOR THE NORTHERN DISTRICT OF ILLINOIS",
+      "",
+      "LINCOLN BROWN,                    )",
+      "                                  )   Case No. 1:24-cv-00981",
+      "            Plaintiff,            )",
+      "      v.                          )   DEFENDANT'S MOTION TO DISMISS",
+      "                                  )   AND MEMORANDUM IN SUPPORT",
+      "MIDWEST TRANSIT AUTHORITY,        )",
+    ].join("\n");
+    expect(documentTitle(caption)).toBe("DEFENDANT'S MOTION TO DISMISS AND MEMORANDUM IN SUPPORT");
+  });
+
+  it("falls back to the whole line when nothing follows the caption rule", () => {
+    // A closing rule (`____ )`) leaves an empty tail; that must not yield an empty title.
+    const withRule = "SOME PLAINTIFF,          )\n              )\n______________)\n\nMOTION TO DISMISS\n";
+    const title = documentTitle(withRule);
+    expect(title.length).toBeGreaterThan(0);
+    expect(title).not.toBe("");
+  });
+
   it("does not invent one from prose", () => {
     const title = documentTitle("Now comes the defendant, by counsel, and moves this Court.\n\nMore prose follows here.");
     expect(title).not.toBe("Now comes the defendant, by counsel, and moves this Court.");
@@ -256,6 +281,12 @@ describe("report: a real audit produces a renderable report", () => {
         UNVERIFIABLE_LOW_CONFIDENCE: 1,
       });
       expect(bundle.items.every((i) => i.reason.trim().length > 0)).toBe(true);
+
+      // The truncation notice is arithmetic on these two numbers, so the relationship between them is
+      // the assertion: a report that claimed to have dropped lines it never had, or that lost count of
+      // what it capped away, would be a silent omission with a number printed beside it.
+      expect(bundle.meta.itemsFound).toBe(itemsFound);
+      expect(bundle.meta.itemsFound).toBeGreaterThanOrEqual(bundle.summary.total);
 
       // The report is retrievable by the id the API hands back — the whole point of the store.
       expect(getReport(bundle.id)).not.toBeNull();

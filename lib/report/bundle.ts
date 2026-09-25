@@ -110,6 +110,14 @@ export interface ReportSummary {
 
 export interface ReportMeta {
   auditedAt: string;
+  /**
+   * How many citations the document produced BEFORE the cap. Never less than `summary.total`.
+   *
+   * Carried on the report rather than recomputed by the page, because the page cannot recompute it
+   * without re-parsing the document, and a truncation notice that guessed would be the exact silent
+   * omission this product exists to catch.
+   */
+  itemsFound: number;
   /** Requests the corpus layer actually issued while producing this report. */
   networkCalls: number;
   /** Which corpus the verdicts were decided against, so a stale report cannot mislead. */

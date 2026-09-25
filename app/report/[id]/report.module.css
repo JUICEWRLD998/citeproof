@@ -1,0 +1,502 @@
+/*
+ * The report page.
+ *
+ * The annotated brief is the hero and the one boldness; everything here is arranged to stay out of
+ * its way. The findings below it are set as a document, not as cards: hairline rules, no fills, no
+ * shadows. A card grid would make six verdicts read as six equivalent products of a dashboard, and
+ * the whole argument of this design is that one verdict accuses and the rest do not.
+ */
+
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 34px 24px 96px;
+}
+
+/* ---------- the audited document's own title ---------- */
+
+.titleBlock {
+  margin: 28px 0 18px;
+}
+
+.title {
+  font-size: 27px;
+  font-weight: var(--weight-hero);
+  line-height: 1.2;
+  margin: 0 0 6px;
+}
+
+.subtitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--weight-mono);
+  color: var(--muted);
+  margin: 0;
+}
+
+.tallyWrap {
+  padding: 14px 0 20px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 30px;
+}
+
+/* The one sentence a reader needs before the document: what this audit found. Larger than body,
+   quieter than the title — a summary that shouts competes with the evidence below it. */
+.headline {
+  font-size: 16.5px;
+  line-height: 1.55;
+  margin: 16px 0 0;
+  color: var(--ink);
+}
+
+.headlineAccent {
+  font-weight: var(--weight-ui);
+}
+
+/* ---------- the annotated brief, with its caption ---------- */
+
+.briefSection {
+  margin-bottom: 54px;
+}
+
+.sectionLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 12px;
+}
+
+/* ---------- findings ---------- */
+
+.findings {
+  border-top: 1px solid var(--line);
+  padding-top: 26px;
+}
+
+/*
+ * The findings' rail column is a FIXED 168px, not `--rail-w` var, and the difference is measured.
+ * `--rail-w` is the brief sheet's margin, sized for the shortest thing a rail must hold. A finding's
+ * rail holds the citation *as the document wrote it* — `163 U.S. 537, 544 (1896)` is 23 characters,
+ * `678 F. Supp. 3d 443, 452 (S.D.N.Y. 2023)` is 40 — and at 11.5px DM Mono the second one needs
+ * ~275px. Measured on the live report at 1280px: every citation wrapped to TWO lines at 168px. The
+ * citation is never truncated (a truncated citation is one the reader cannot check), so the column
+ * widens instead, and the body keeps a readable measure because the page is 1180px wide.
+ */
+.finding {
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  align-items: start;
+  padding: 0 0 26px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid var(--line);
+  /* The rail entry links DOWN to here, so the anchor must not land under the top edge. */
+  scroll-margin-top: 24px;
+}
+
+.finding:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/*
+ * The rail column of a finding names the citation and the verdict — the same two facts the margin
+ * rail carries in the document above, so a reader arriving from a clicked rail entry lands on the
+ * same pair and does not have to re-orient.
+ */
+.findingRail {
+  padding: 2px 16px 0 0;
+}
+
+.findingCite {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: var(--weight-mono);
+  color: var(--muted);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  margin: 0 0 7px;
+}
+
+.findingMark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.findingLabel {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.findingBody {
+  min-width: 0;
+}
+
+.reason {
+  font-size: 14.5px;
+  line-height: 1.62;
+  margin: 0 0 12px;
+  color: var(--ink);
+}
+
+/*
+ * The excerpt: the opinion's own bytes around the span the verdict was decided on, indented behind a
+ * rule. Not a card — no surface, no border box — because it is a passage of a judicial opinion shown
+ * as evidence, and evidence presented in a card reads as a claim rather than as a quotation.
+ */
+.excerpt {
+  margin: 0 0 12px;
+  padding: 0 0 0 14px;
+  border-left: 2px solid var(--line);
+  font-size: 14px;
+  line-height: 1.68;
+  color: var(--muted);
+}
+
+.excerptCaption {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 6px;
+}
+
+/*
+ * The matched span inside the excerpt. `<mark>` is the right element — it IS a reference highlight —
+ * but its default yellow would be a fourth hue on a page whose palette is deliberately bounded, so
+ * the mark keeps the element and gives up the background, carrying emphasis by weight instead.
+ */
+.excerptMark {
+  background: none;
+  color: var(--ink);
+  font-weight: var(--weight-ui);
+}
+
+.ellipsis {
+  color: var(--faint);
+}
+
+/* ---------- findings: the quiet metadata rows ---------- */
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: var(--weight-mono);
+  color: var(--muted);
+}
+
+.metaKey {
+  color: var(--faint);
+}
+
+/* The source link is the receipt: it must be visibly a link and must state which kind it is. */
+.source {
+  font-size: 11px;
+}
+
+.sourceKind {
+  color: var(--faint);
+}
+
+/*
+ * MISATTRIBUTED: the true home and the quoters that lost. The losing candidates are shown rather
+ * than hidden — the resolver RANKS them, and a ranked list the reader cannot see is an assertion
+ * about a decision it cannot check.
+ *
+ * The panel is LIGHTER than the page (`--surface`, not a tint below `--paper`). A sunken tone cannot
+ * hold this palette's text at its contrast targets — see the note on `--surface-sunken` in
+ * styles/tokens.css, which is why that token does not exist.
+ */
+.home {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+.homeHead {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 8px;
+}
+
+.homeName {
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin: 0 0 4px;
+  color: var(--ink);
+}
+
+.homeCite {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--weight-mono);
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.candidates {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.candidate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  align-items: baseline;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  padding: 3px 0;
+}
+
+.candidateRank {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--weight-mono);
+  color: var(--faint);
+  min-width: 18px;
+}
+
+.candidateName {
+  color: var(--ink);
+}
+
+.candidateCite {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: var(--weight-mono);
+}
+
+.rankNote {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--faint);
+  margin: 8px 0 0;
+}
+
+/* ---------- the belt, reported as a status rather than as a result ---------- */
+
+.belt {
+  margin: 12px 0 0;
+  padding: 11px 14px;
+  border-left: 2px solid var(--line);
+  border-radius: 0 var(--r-chip) var(--r-chip) 0;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.beltHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 7px;
+}
+
+.beltDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.dotSupported {
+  background: var(--verified);
+}
+
+.dotUnsupported {
+  background: var(--fabricated);
+}
+
+/* A decline and an unavailability are not findings, so their dot carries no verdict hue at all. */
+.dotQuiet {
+  border: 1px solid var(--line-strong);
+}
+
+.beltReason {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0;
+}
+
+.beltProposal {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 7px 0 0;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+
+.beltProposalLabel {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--faint);
+  display: block;
+}
+
+/* ---------- the resolution trace: a receipt, not a log dump ---------- */
+
+.trace {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: var(--weight-mono);
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.traceStep {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+}
+
+.traceSource {
+  color: var(--faint);
+  min-width: 132px;
+}
+
+.traceQuery {
+  overflow-wrap: anywhere;
+}
+
+.traceMiss {
+  color: var(--misattributed);
+}
+
+/* ---------- the document-level colophon ---------- */
+
+.colophon {
+  margin-top: 44px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+
+.colophonHead {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: var(--weight-mono);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0 0 10px;
+}
+
+.colophon p {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0 0 8px;
+  max-width: 78ch;
+}
+
+.coverage {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: var(--weight-mono);
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.coverageReporter {
+  color: var(--faint);
+}
+
+/* ---------- the empty state ---------- */
+
+/*
+ * Written as a sentence, not as an error. A document with no auditable citations is a legitimate
+ * outcome, and the honest report of it is what the tool actually knows — not a grey illustration
+ * telling the reader something went wrong.
+ */
+.empty {
+  border-top: 1px solid var(--line);
+  padding-top: 26px;
+  max-width: 62ch;
+}
+
+.emptyLead {
+  font-size: 17px;
+  font-weight: var(--weight-ui);
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+
+.empty p {
+  font-size: 14px;
+  line-height: 1.62;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+@media (max-width: 860px) {
+  .finding {
+    grid-template-columns: 1fr;
+  }
+
+  .findingRail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    padding: 0 0 8px;
+  }
+
+  .findingCite {
+    margin: 0;
+  }
+
+  .traceSource {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 22px 16px 64px;
+  }
+
+  .title {
+    font-size: 22px;
+  }
+}

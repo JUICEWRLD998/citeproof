@@ -84,9 +84,17 @@
   }
 }
 
+/*
+ * UNVERIFIABLE borrows `--muted` rather than a line tone, so the refusal's underline, its glyph and
+ * its label are all the same quiet value. It was `--line-strong` first, which measured **1.47:1**
+ * against paper — a mark that is required to identify a state must clear 3:1 (WCAG 1.4.11), and a
+ * hairline tone cannot. `--muted` measures 4.62:1 and costs nothing, because the refusal is
+ * supposed to be the quietest thing on the page and a quieter ink would have made it unreadable
+ * instead of quiet.
+ */
 .markUnverifiable {
   text-decoration-line: underline;
-  text-decoration-color: var(--line-strong);
+  text-decoration-color: var(--muted);
   text-decoration-thickness: 1px;
   text-decoration-style: dotted;
   text-underline-offset: 3px;

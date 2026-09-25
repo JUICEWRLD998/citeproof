@@ -29,6 +29,8 @@
   padding: 0 16px 0 18px;
   border-right: 1px solid var(--line);
   min-height: 100%;
+  /* A grid item, so it must be told it may shrink; see the note on `.paragraph`. */
+  min-width: 0;
 }
 
 .entry {
@@ -78,6 +80,19 @@
   font-size: 15px;
   line-height: 1.72;
   color: var(--ink);
+  /*
+   * A brief contains token runs with NO break opportunity — the fixture's signature rule is 35
+   * underscores — and at 375px that run is wider than the whole column, so it stretched the grid
+   * track and pushed the page to 379px against a 375px viewport. Measured by the driver, which
+   * reported `scrollWidth 379 > clientWidth 375` and named this element as the culprit.
+   *
+   * `anywhere` rather than `break-word`: it is the value that permits breaking a long token AND
+   * counts the broken token toward the element's min-content size, which is what actually lets the
+   * grid track shrink. `min-width: 0` is the companion fix — a grid item defaults to `min-width:
+   * auto`, so it refuses to shrink below its content however the text wraps.
+   */
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .paragraph:last-child {

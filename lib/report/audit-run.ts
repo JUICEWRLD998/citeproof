@@ -50,7 +50,9 @@ export async function runAudit(
   // One corpus instance for the whole run, so `networkCalls()` is a real measurement of THIS audit
   // rather than of every audit the process has served.
   const corpus = new Corpus();
-  const results = await Promise.all(items.map((item) => auditItem(item, { corpus, verbose: true })));
+  // No `verbose` flag: `resolutionTrace` and `trueHomeCandidates` are produced unconditionally, and
+  // the option that once gated them lives on `lib/audit.ts`'s wrapper rather than on `auditItem`.
+  const results = await Promise.all(items.map((item) => auditItem(item, { corpus })));
 
   const belt = opts.belt === false ? null : await runBelt(document, items, results);
   const coverage = loadCoverageTable();
@@ -65,6 +67,7 @@ export async function runAudit(
     belt,
     meta: {
       auditedAt: new Date().toISOString(),
+      itemsFound: allItems.length,
       networkCalls: corpus.networkCalls(),
       corpus: "Harvard Caselaw Access Project bulk static (static.case.law)",
       coverage: Object.entries(coverage.reporters)
@@ -170,23 +173,60 @@ function unavailableBelt(reason: string): ReportBelt {
 const TITLE_WORDS =
   /\b(MOTION|MEMORANDUM|BRIEF|COMPLAINT|PETITION|ANSWER|RESPONSE|OPPOSITION|REPLY|AFFIDAVIT|DECLARATION)\b/;
 
-export function documentTitle(document: string): string {
-  const lines = document
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .slice(0, 24);
+/**
+ * The title inside a caption line.
+ *
+ * A brief's caption is a table: the parties to the left, a column of `)`, and the document's own
+ * name to the right — `v.                    )   DEFENDANT'S MOTION TO DISMISS`. The first version of
+ * this returned the whole line, so the report page and the browser tab were headed
+ * `v. ) DEFENDANT'S MOTION TO DISMISS`, which is the docket's shape rather than the document's name.
+ * Measured on the fixture brief, in the served HTML.
+ *
+ * Returns `null` when there is nothing after the column, so a closing rule (`____ )`) is not mistaken
+ * for a title.
+ */
+function tailAfterCaption(line: string): string | null {
+  const collapsed = line.replace(/\s+/g, " ").trim();
+  const close = collapsed.lastIndexOf(")");
+  const tail = close === -1 ? collapsed : collapsed.slice(close + 1).trim();
+  return tail.length >= 3 ? tail : null;
+}
 
-  const heading = lines.find(
-    (l) =>
-      l.length <= 90 &&
-      !/[.!?]$/.test(l) &&
-      TITLE_WORDS.test(l.toUpperCase()) &&
-      uppercaseRatio(l) >= 0.6,
+/** True when a line reads like a document's own heading rather than a sentence or a docket entry. */
+function looksLikeHeading(line: string): boolean {
+  return (
+    line.length <= 90 &&
+    !/[.!?]$/.test(line) &&
+    TITLE_WORDS.test(line.toUpperCase()) &&
+    uppercaseRatio(line) >= 0.6
   );
-  if (heading) return heading;
+}
 
-  const first = lines[0];
+export function documentTitle(document: string): string {
+  const lines = document.split("\n").slice(0, 30);
+
+  for (let i = 0; i < lines.length; i++) {
+    const tail = tailAfterCaption(lines[i]);
+    if (!tail || !looksLikeHeading(tail)) continue;
+
+    // The caption's title column WRAPS: the fixture brief reads `) DEFENDANT'S MOTION TO DISMISS`
+    // then `) AND MEMORANDUM IN SUPPORT`. Taking only the first line truncated the name, so
+    // continuation lines are joined while they are still part of the same table — contiguous, each
+    // with its own `)` column, and each still reading as a heading. The table ends at a blank line or
+    // at a line whose tail stops looking like a heading, which is where the parties resume.
+    const parts = [tail];
+    for (let j = i + 1; j < lines.length; j++) {
+      const raw = lines[j];
+      if (!raw.trim()) break;
+      if (!raw.includes(")")) break;
+      const next = tailAfterCaption(raw);
+      if (!next || !looksLikeHeading(next)) break;
+      parts.push(next);
+    }
+    return parts.join(" ");
+  }
+
+  const first = lines.find((l) => l.trim())?.replace(/\s+/g, " ").trim();
   if (first && first.length <= 90 && !/[.!?]$/.test(first) && !/[.]\s*\S/.test(first)) return first;
 
   const words = document.trim().split(/\s+/).slice(0, 8).join(" ");
