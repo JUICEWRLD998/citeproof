@@ -1,6 +1,13 @@
 import { defineConfig } from "vitest/config";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig({
+  resolve: {
+    // `@/*` is a tsconfig path. Next resolves it; Vite does not, so without this a test that
+    // imports a module using the alias fails to resolve — and the failure looks like a missing
+    // file rather than a missing alias.
+    alias: { "@": fileURLToPath(new URL(".", import.meta.url)) },
+  },
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],

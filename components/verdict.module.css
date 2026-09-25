@@ -1,0 +1,101 @@
+/*
+ * Verdict tones and marks.
+ *
+ * This is the one place in the build where more than one hue is allowed, and it is bounded on
+ * purpose: the tones exist for the four verdict GREYSCALE cannot separate and for the two refusal
+ * reasons, they are applied only to a mark and its label, and body copy never takes a hue. The
+ * design's own argument is in the numbers — UNVERIFIABLE has no hue of its own at all
+ * (Lab chroma 3.2 against 23.5–73.4 for the marks above it), so the quietest thing on the page is
+ * the one that says "I don't know". See docs/DESIGN.md §3.
+ */
+
+.toneVerified {
+  color: var(--verified);
+}
+
+.toneMisattributed {
+  color: var(--misattributed);
+}
+
+.toneFabricated {
+  color: var(--fabricated);
+}
+
+.toneUnverifiable {
+  color: var(--muted);
+}
+
+/*
+ * Marks inside the document. `text-decoration` rather than a border or a background: it does not
+ * touch layout, so a marked word never reflows the paragraph around it, and the browser already
+ * handles the awkward cases (line breaks, punctuation, hyphenation) that a hand-drawn underline
+ * gets wrong.
+ */
+.markVerified {
+  text-decoration-line: underline;
+  text-decoration-color: var(--verified);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.markMisattributed {
+  text-decoration-line: underline;
+  text-decoration-color: var(--misattributed);
+  text-decoration-thickness: 1.5px;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
+}
+
+.markFabricated {
+  position: relative;
+  color: var(--muted);
+  text-decoration-line: line-through;
+  text-decoration-color: var(--fabricated);
+  text-decoration-thickness: 1.5px;
+}
+
+/*
+ * The strike-through rule, drawn OVER the text rather than as a text-decoration.
+ *
+ * This is the page's single piece of motion and the only place the design raises its voice. It is
+ * drawn once, over 180ms, from the left — the gesture of a pen crossing out a line — and it is
+ * disabled entirely under `prefers-reduced-motion`, in which case the text-decoration above still
+ * carries the mark. The rule is never the only signal: the line is also struck by the decoration and
+ * labelled `fabricated` in the margin.
+ */
+.markFabricated::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 54%;
+  height: 1.5px;
+  background: var(--fabricated);
+  transform-origin: left center;
+  animation: strike var(--t-strike) cubic-bezier(0.2, 0, 0.2, 1) both;
+}
+
+@keyframes strike {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/*
+ * UNVERIFIABLE borrows `--muted` rather than a line tone, so the refusal's underline, its glyph and
+ * its label are all the same quiet value. It was `--line-strong` first, which measured **1.47:1**
+ * against paper — a mark that is required to identify a state must clear 3:1 (WCAG 1.4.11), and a
+ * hairline tone cannot. `--muted` measures 4.62:1 and costs nothing, because the refusal is
+ * supposed to be the quietest thing on the page and a quieter ink would have made it unreadable
+ * instead of quiet.
+ */
+.markUnverifiable {
+  text-decoration-line: underline;
+  text-decoration-color: var(--muted);
+  text-decoration-thickness: 1px;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}

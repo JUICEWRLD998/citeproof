@@ -1,236 +1,146 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { AuditForm } from "@/components/AuditForm";
+import { Masthead } from "@/components/Masthead";
+import { VERDICTS, VerdictMark, toneClass } from "@/components/verdict";
+import { beltConfigFromEnv } from "@/lib/llm";
+import { loadCoverageTable } from "@/lib/corpus";
+import type { Verdict } from "@/lib/types";
 import styles from "./page.module.css";
 
 /**
- * The four verdict marks, drawn rather than iconised.
- * Colour is NEVER the sole signal (WCAG 1.4.1): each mark is a distinct SHAPE and every
- * rail also carries a text label, so a verdict survives greyscale and any form of
- * colour-vision deficiency. The palette reinforces; the form carries.
+ * The audit input.
+ *
+ * A SERVER component, and that is load-bearing rather than incidental: it reads the belt's
+ * configuration from `process.env` so the masthead can state whether a model will be consulted. If
+ * this file ever became a client component the key would have to reach the browser to answer that
+ * question — which is exactly the containment Phase 6 asserts and `tests/selfverify.test.ts` fails
+ * the build over.
  */
-function Mark({ verdict, size = 15 }: { verdict: string; size?: number }) {
-  const common = {
-    width: size,
-    height: size,
-    viewBox: "0 0 16 16",
-    fill: "none",
-    "aria-hidden": true,
-    focusable: false as const,
-  };
-  const stroke = 1.5;
+export const dynamic = "force-dynamic";
 
-  if (verdict === "VERIFIED") {
-    return (
-      <svg {...common}>
-        <circle cx="8" cy="8" r="6.4" stroke="currentColor" strokeWidth={stroke} />
-        <path d="M5.1 8.3l2 2 3.8-4.2" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
+/**
+ * The sample brief, read from the file the test suite audits. Deliberately the same bytes: a landing
+ * page demo built on a *different* document would let the front page drift away from the fixture
+ * every verdict was verified against.
+ */
+function sampleBrief(): string {
+  try {
+    return readFileSync(join(process.cwd(), "fixtures/briefs/motion-to-dismiss.txt"), "utf8");
+  } catch {
+    // A build where the fixture is absent still serves an input. The button simply has nothing to
+    // fill in, which is a smaller failure than the page refusing to render.
+    return "";
   }
-  if (verdict === "MISATTRIBUTED") {
-    // an arrow leaving the frame: the sentence is real, but it lives elsewhere
-    return (
-      <svg {...common}>
-        <circle cx="8" cy="8" r="6.4" stroke="currentColor" strokeWidth={stroke} />
-        <path d="M5.4 10.6l5.2-5.2" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" />
-        <path d="M7.6 5.4h3v3" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  if (verdict === "FABRICATED") {
-    return (
-      <svg {...common}>
-        <circle cx="8" cy="8" r="6.4" stroke="currentColor" strokeWidth={stroke} />
-        <path d="M5.6 5.6l4.8 4.8M10.4 5.6l-4.8 4.8" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" />
-      </svg>
-    );
-  }
-  // UNVERIFIABLE: dashed frame, a dash where a judgement would be. No fill, no hue.
-  return (
-    <svg {...common}>
-      <circle cx="8" cy="8" r="6.4" stroke="currentColor" strokeWidth={stroke} strokeDasharray="2.2 2.2" />
-      <path d="M5.4 8h5.2" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" />
-    </svg>
-  );
 }
 
-const LEGEND = [
-  {
-    verdict: "VERIFIED",
-    cls: styles.vVerified,
-    body: "The citation resolves to a real case and the quotation is found verbatim in it, with character offsets a third party can re-run.",
-  },
-  {
-    verdict: "MISATTRIBUTED",
-    cls: styles.vMisattributed,
-    body: "The sentence is real, but it is not in the case you cited. We name where it actually lives. No competitor ships this.",
-  },
-  {
-    verdict: "FABRICATED",
-    cls: styles.vFabricated,
-    body: "The citation resolves to no case, and the corpus that would contain it was readable. Reported with the full resolution log.",
-  },
-  {
-    verdict: "UNVERIFIABLE",
-    cls: styles.vUnverifiable,
-    body: "We cannot say. The case is past our corpus boundary, the record is too OCR-damaged, or the citation did not resolve. Never reported as fabricated.",
-  },
-];
-
-/** Preview lines, taken verbatim from the verified fixtures in fixtures/ground-truth.json. */
-const LINES = [
-  {
-    cite: "347 U.S. 483",
-    verdict: "VERIFIED",
-    cls: styles.vVerified,
-    label: "verified",
-    body: (
-      <>
-        In <em>Brown v. Board of Education</em>, 347 U.S. 483, 495 (1954), the Court held
-        that &ldquo;<span className={styles.quoteFound}>Separate educational facilities are inherently unequal.</span>&rdquo;
-      </>
-    ),
-    note: null,
-  },
-  {
-    cite: "163 U.S. 537",
-    verdict: "MISATTRIBUTED",
-    cls: styles.vMisattributed,
-    label: "misattributed",
-    body: (
-      <>
-        It was first announced in <em>Plessy v. Ferguson</em>, 163 U.S. 537, 544 (1896),
-        where the Court held that &ldquo;<span className={styles.quoteFound}>Separate educational facilities are inherently unequal.</span>&rdquo;
-      </>
-    ),
-    note: "That sentence is in 347 U.S. 483, char 9564 — not in Plessy. Plessy's own OCR confidence is 0.434.",
-  },
-  {
-    cite: "999 U.S. 1234",
-    verdict: "FABRICATED",
-    cls: styles.vFabricated,
-    label: "fabricated",
-    body: (
-      <>
-        See <em>Anderson v. Liberty Lobby, Inc.</em>, 999 U.S. 1234, 1240 (2021) (holding
-        that &ldquo;<span className={styles.struck}>summary judgment is warranted only where the evidence is such that no reasonable jury could return a verdict for the nonmoving party</span>&rdquo;).
-      </>
-    ),
-    note: "Reporter volume 999 does not exist — the U.S. Reports corpus ends at volume 572.",
-  },
-  {
-    cite: "678 F. Supp. 3d 443",
-    verdict: "UNVERIFIABLE",
-    cls: styles.vUnverifiable,
-    label: "unverifiable",
-    body: (
-      <>
-        Nor can Plaintiff rely on <em>Mata v. Avianca, Inc.</em>, 678 F. Supp. 3d 443, 452
-        (S.D.N.Y. 2023), which the Complaint cites for a duty of candor to the tribunal.
-      </>
-    ),
-    note: "f-supp-3d coverage ends 2019-08-19. This case is real and post-dates it — so we refuse to call it invented.",
-  },
+/** The order the verdicts are explained in: the three that decide, then the three that refuse. */
+const LEGEND_ORDER: Verdict[] = [
+  "VERIFIED",
+  "MISATTRIBUTED",
+  "FABRICATED",
+  "UNVERIFIABLE_COVERAGE",
+  "UNVERIFIABLE_LOW_CONFIDENCE",
+  "UNVERIFIABLE_UNRESOLVED",
 ];
 
 export default function Home() {
+  const belt = beltConfigFromEnv();
+  const coverage = loadCoverageTable();
+  const coverageEnd = Object.values(coverage.reporters)
+    .map((r) => r.latestDecisionDate)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+
   return (
     <main className={styles.page}>
-      <header className={styles.masthead}>
-        <h1 className={styles.wordmark}>CiteProof</h1>
-        <p className={styles.tagline}>
-          Citation and quotation audit for AI-drafted briefs — against primary law.
-        </p>
-        <span className={styles.spacer} />
-        <span className={styles.badge}>design preview · engine in build</span>
-      </header>
+      <Masthead
+        beltMode={belt ? "belt-enabled" : "deterministic-only"}
+        coverageEnd={coverageEnd}
+      />
 
       <section className={styles.thesis}>
         <h2>
-          It checks every citation and every quotation — and it tells you when it cannot
-          be sure.
+          It checks every citation and every quotation — and it tells you when it cannot be sure.
         </h2>
         <p>
-          Asking one model to verify another fails silently, exactly where it matters. So
-          CiteProof does not ask a model. It fetches the opinion itself, from a keyless
-          primary-law corpus, and checks the text against the text.
+          Asking one model to verify another fails silently, exactly where it matters. So CiteProof
+          does not ask a model whether a citation is real. It fetches the opinion itself, from a
+          keyless primary-law corpus, and checks the text against the text.
         </p>
         <p>
-          The hard part is not finding fabrications. It is <em>not accusing a correct
-          brief</em>. Checked naively, the most famous sentence in American constitutional
-          law reports zero occurrences, because the corpus capitalises{" "}
-          <span className="mono">Separate</span>. A tool that cries wolf on{" "}
-          <em>Brown v. Board</em> is worse than no tool at all.
+          The hard part is not finding fabrications. It is <em>not accusing a correct brief</em>.
+          Checked naively, the most famous sentence in American constitutional law reports zero
+          occurrences, because the corpus capitalises <span className="mono">Separate</span>. A tool
+          that cries wolf on <em>Brown v. Board</em> is worse than no tool at all.
         </p>
       </section>
 
+      <AuditForm sample={sampleBrief()} />
+
       <section className={styles.legend} aria-label="Verdict vocabulary">
-        {LEGEND.map((l) => (
-          <div key={l.verdict} className={styles.legendItem}>
-            <div className={styles.legendHead}>
-              <span className={l.cls}>
-                <Mark verdict={l.verdict} size={16} />
-              </span>
-              <span className={`${styles.legendName} ${l.cls}`}>{l.verdict}</span>
+        {LEGEND_ORDER.map((verdict) => {
+          const style = VERDICTS[verdict];
+          return (
+            <div className={styles.legendItem} key={verdict} data-ui={`legend ${verdict}`}>
+              <div className={styles.legendHead}>
+                <span className={toneClass(verdict)}>
+                  <VerdictMark verdict={verdict} size={16} />
+                </span>
+                <span className={`${styles.legendName} ${toneClass(verdict)}`}>{style.label}</span>
+              </div>
+              <p className={styles.legendBody}>{style.meaning}</p>
+              <p className={styles.legendMark}>
+                <span className={styles.legendMarkKey}>marked in the document</span> {style.mark}
+              </p>
             </div>
-            <p className={styles.legendBody}>{l.body}</p>
-          </div>
-        ))}
+          );
+        })}
       </section>
 
-      <p className={styles.sectionLabel}>
-        The annotated brief — four real fixture lines, verified against the corpus
-      </p>
-
-      <article className={styles.brief}>
-        {LINES.map((l) => (
-          <div key={l.cite + l.verdict} className={styles.auditedLine}>
-            <div className={styles.rail}>
-              <span className={styles.railCite}>{l.cite}</span>
-              <span className={`${styles.railMark} ${l.cls}`}>
-                <Mark verdict={l.verdict} />
-                <span className={styles.railLabel}>{l.label}</span>
-              </span>
-            </div>
-            <div className={styles.lineBody}>
-              {l.body}
-              {l.note && (
-                <>
-                  {l.verdict === "UNVERIFIABLE" && <hr className={styles.unverifiableRule} />}
-                  <p
-                    style={{
-                      margin: "7px 0 0",
-                      fontSize: "12.5px",
-                      lineHeight: 1.55,
-                      color: "var(--muted)",
-                    }}
-                  >
-                    {l.note}
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-        ))}
-      </article>
-
-      <section className={styles.status}>
-        <div className={styles.statusBlock}>
-          <h3>Verified against primary source</h3>
+      <section className={styles.rails}>
+        <div className={styles.railBlock}>
+          <h3>What it will not do</h3>
           <ul>
-            <li>Harvard CAP bulk static serves verbatim opinion text with no key and no quota</li>
-            <li><span className="mono">us/347/cases/0483-01.json</span> — 26,823 chars, OCR 0.664</li>
-            <li><span className="mono">us/163/cases/0537-01.json</span> — OCR 0.434, two opinions</li>
-            <li>CourtListener full-text endpoints are 401; search only, ~5 req/min</li>
-            <li>22 failing tests already encode these four verdicts</li>
+            <li>
+              It will not call a citation fabricated because the case is newer than its corpus. Beyond
+              the boundary above, the answer is <em>unverifiable</em>.
+            </li>
+            <li>
+              It will not accuse on OCR-degraded text. Below a measured confidence floor, an absence
+              proves nothing either way.
+            </li>
+            <li>
+              It will not treat an empty volume index as evidence. A failed fetch and a nonexistent
+              volume look identical from inside the pipeline.
+            </li>
+            <li>
+              No model decides a verdict. The belt proposes a span; the matcher adjudicates it, and{" "}
+              <span className="mono">lib/verdict</span> cannot import{" "}
+              <span className="mono">lib/llm</span> at all — asserted, not assumed.
+            </li>
           </ul>
         </div>
-        <div className={styles.statusBlock}>
-          <h3>Still to build</h3>
+        <div className={styles.railBlock}>
+          <h3>What it costs, and where the data comes from</h3>
           <ul>
-            <li><span className={styles.pending}>Phase 1</span> — corpus layer, sha256 cache, coverage boundary</li>
-            <li><span className={styles.pending}>Phase 2–3</span> — citation parser, normalisation, resolution cascade</li>
-            <li><span className={styles.pending}>Phase 4–5</span> — quote matcher, verdicts, misattribution resolver</li>
-            <li><span className={styles.pending}>Phase 6</span> — OpenRouter proposal belt, self-verified</li>
-            <li><span className={styles.pending}>Phase 7</span> — this preview wired to the live engine</li>
+            <li>
+              The corpus is Harvard&apos;s Caselaw Access Project bulk static — free, keyless, and no
+              quota. A document with no model consulted costs nothing to audit.
+            </li>
+            <li>
+              CourtListener is used for search only. Its full-text endpoints return 401, and its
+              anonymous budget is roughly five requests a minute.
+            </li>
+            <li>
+              When the belt runs, the cost is read from the response rather than computed from a price
+              list, and reported per line. An unmeasured cost is reported as absent, never as zero.
+            </li>
+            <li>
+              Nothing is persisted. A brief is privileged, so a report lives in this process and
+              nowhere else.
+            </li>
           </ul>
         </div>
       </section>

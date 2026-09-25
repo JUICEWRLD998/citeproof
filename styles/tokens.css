@@ -19,11 +19,26 @@
 
 :root {
   /* ---- surfaces: warm, never pure white, never pure black ---- */
+  /*
+   * There is no `--surface-sunken`, and that is a measured decision rather than an omission. A tint
+   * below `--paper` cannot carry this palette's text at its targets: at #f2f1ec, `--muted` measured
+   * **4.38:1** (needs 4.5), `--faint` **2.94:1** (needs 3.0) and `--accent-ink` **4.32:1** (needs
+   * 4.5). Paper is too light for much darkening to be available, so a sunken panel would have
+   * quietly degraded every word set on it. Panels therefore go the other way — `--surface` is
+   * LIGHTER than paper, which raises contrast instead of eating it — and a new background tone has
+   * to be measured against `node .recon/contrast.mjs` before any text lands on it.
+   */
   --paper: #f8f7f4;
   --surface: #fffefa;
-  --surface-sunken: #f2f1ec;
+  /* --line draws decorative hairlines between blocks: WCAG exempts those, and it measures 1.22:1. */
   --line: #e2e1da;
-  --line-strong: #cfcec6;
+  /*
+   * --line-strong draws a boundary that is the ONLY thing identifying a control — the audit field,
+   * the disabled button, the quiet belt dot. That makes it a non-text UI component under WCAG
+   * 1.4.11, which needs 3:1, and it previously shipped at **1.47:1**. Solved to 3.21:1 on paper and
+   * 3.41:1 on the panel by walking the hue down in HSL, so the warm cast survives the correction.
+   */
+  --line-strong: #8d8b79;
 
   /* ---- ink ---- */
   --ink: #292a26;
@@ -88,16 +103,45 @@
   /* ---- motion ---- */
   --t-colour: 0.15s ease;
   --t-move: 0.2s cubic-bezier(0.2, 0, 0.2, 1);
+  /*
+   * The strike-through on a FABRICATED line — the page's only animation, and it exists to be seen
+   * once. 180ms: slow enough to read as a deliberate pen stroke, fast enough that a reader watching
+   * a demo does not wait for it. Nothing else on the page animates, on purpose.
+   */
+  --t-strike: 0.18s;
+
+  /* ---- layout ---- */
+  /*
+   * The margin rail's width, in the annotated BRIEF. 168px keeps the margin narrow — a wide rail
+   * stops reading as a margin and starts reading as a second column, which is the layout the design
+   * deliberately avoids.
+   *
+   * Measured on the built page, at this width the rail's citations wrap to TWO lines each, and that
+   * is accepted rather than fixed: the rail shows the citation as the DRAFTER wrote it
+   * (`347 U.S. 483, 495 (1954)`, up to 40 characters including a court and a year), the wrap happens
+   * at a space rather than mid-token, and it is UNIFORM — all five entries are two lines, so every
+   * verdict mark lands on the same offset and the rhythm holds. The two things that would break it
+   * are checked in `.recon/driver.mjs`: a citation that overflows its column, and a set of entries
+   * that wraps to differing line counts.
+   *
+   * A finding's rail is a different column with a different job and sizes itself in
+   * `app/report/[id]/report.module.css`.
+   */
+  --rail-w: 168px;
+  --rail-gap: 22px;
 
   /* ---- shadows: warm-tinted only; a neutral black shadow on warm paper reads as dirt ---- */
   --shadow-key: 0 2px 0 rgba(216, 66, 32, 0.11);
   --shadow-lift: 0 5px 12px rgba(238, 88, 32, 0.16);
+  /* Contact + ambient, the pairing that makes a surface sit ON the page rather than float over it. */
+  --shadow-sheet: 0 1px 0 rgba(48, 49, 39, 0.02), 0 18px 44px rgba(36, 38, 19, 0.05);
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
     --t-colour: 0s;
     --t-move: 0s;
+    --t-strike: 0s;
   }
 }
 
@@ -110,9 +154,8 @@
   :root:not([data-theme="light"]) {
     --paper: #1b1a18;
     --surface: #22211e;
-    --surface-sunken: #171614;
     --line: #34322d;
-    --line-strong: #45423b;
+    --line-strong: #767166;      /* 3.58:1 on dark paper — same 1.4.11 requirement as light mode */
 
     --ink: #f0eee8;
     --muted: #a3a196;

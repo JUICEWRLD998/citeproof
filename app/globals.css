@@ -14,8 +14,32 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   font-weight: var(--weight-body);
+  /*
+   * 550 is the design's signature weight and it needs the VARIABLE face; the token file already
+   * falls back to a static family, where 550 snaps to 500/600 with no error anywhere. `tests` and
+   * `.recon/driver.mjs` both assert the computed weight, because a silent snap is invisible.
+   */
+  font-synthesis-weight: none;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/*
+ * Every heading states its own size, but not its weight — and a UA default of 700 would silently
+ * override the design's 550. Measured on the Phase 0 preview: an `h3` with no declared weight
+ * rendered at 700. The default therefore lives here, once, and any heading that wants something else
+ * says so.
+ */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: var(--weight-ui);
+  margin: 0;
+  letter-spacing: var(--tracking-display);
+  line-height: 1.18;
 }
 
 ::selection {
@@ -44,4 +68,26 @@ code,
 .mono {
   font-family: var(--font-mono);
   font-size: 0.92em;
+  font-weight: var(--weight-mono);
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--line);
+}
+
+/*
+ * Reduced motion kills EVERY transition and animation, including ::before / ::after — the strike
+ * rule is drawn by a pseudo-element, so a rule that only covered elements would leave exactly the
+ * one animation in the build running.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
